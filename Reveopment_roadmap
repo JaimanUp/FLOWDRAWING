@@ -1,0 +1,367 @@
+Development Roadmap
+Flow-Guided Generative Drawing Engine
+
+Phase 0 — Project Setup
+    Goal: Create a clean foundation.
+
+    Environment
+
+        Language: Java
+
+        Framework: Processing (P2D renderer)
+
+        Recommended structure:
+
+            /src
+                MainApp.pde
+                config/
+                field/
+                bots/
+                brushes/
+                simulation/
+                render/
+                export/
+                optimization/
+                ui/
+
+    Key libraries:
+
+        - Processing core
+        - ControlP5 (UI controls)
+        -Apache Commons Math (optional)
+        -Batik SVG (optional for export)
+
+Phase 1 — Core Canvas System
+
+    Goal: Build the visual workspace.
+
+    Features
+        Resizable canvas
+        Zoom
+        Pan
+        Multi-layer rendering
+    
+    Layers
+        PGraphics backgroundLayer
+        PGraphics vectorFieldLayer
+        PGraphics strokeLayer
+        PGraphics botLayer
+
+    Render order:
+        background
+        vector field (optional visibility)
+        user strokes
+        bot strokes
+        bot visualization
+
+    Tasks
+
+        Implement:
+
+            CanvasManager
+            CameraController
+            LayerRenderer
+
+    Important:
+    Zoom and pan must affect visualization only, not simulation coordinates.
+
+
+Phase 2 — Vector Field Engine
+    Goal: Build the mathematical core.
+
+    Data Structure
+        Grid of vectors:
+            class VectorField {
+                int cols
+                int rows
+                float cellSize
+
+                PVector[][] vectors
+            }
+        Typical configuration:
+            cellSize = 10 px
+        For 4000px canvas:
+            400 x 400 grid
+            160,000 vectors
+
+    Field Rules
+        Each vector stores:
+            vx
+            vy
+        Magnitude limit:
+            maxMagnitude
+        Global rule (VERY IMPORTANT):When 30% of vectors reach maxMagnitude:
+            scaleFactor = maxMagnitude / currentMax
+            scale all vectors
+            
+            This becomes a function:
+                normalizeFieldIfNeeded()
+
+Phase 3 — Field Visualization
+    Goal: Debug the field.
+    Two modes:
+        Arrow Mode
+            drawVector(x,y)
+        Flow Map Mode
+            Color mapping:
+                hue = direction
+                brightness = magnitude
+
+            Allow toggle in UI.
+
+Phase 4 — Brush System
+    Goal: Allow user to draw flow fields.
+    Tools
+        Tool                 Falloff
+        Pencil                 Linear
+        Brush                   Gaussian
+        Marker                  Hard Edge
+    Brush Engine
+        Formula:
+            vector += mouse_delta \* falloff(distance)
+        Where
+             mouse_delta = currentMouse - previousMouse
+    Falloff Functions
+        Linear:
+            1 - (distance/radius)
+        Gaussian:
+            exp(-(d² / sigma²))
+        Hard Edge:
+            if distance < radius → 1
+            else → 0
+    Brush Class
+        class Brush {
+            float size
+            float hardness
+            float spacing
+            FalloffType falloff
+            }
+
+    Spacing behaves like Photoshop spacing.
+
+Phase 5 — Bot Simulation Engine
+    Goal: Generate trajectories.
+    Bot Structure
+        class Bot {
+
+            PVector position
+            PVector velocity
+
+            float life
+            float maxLife
+
+            float radar
+            float drift
+
+            ArrayList<PVector> path
+        }     
+    Bot Spawn
+        Random:
+        position = random(canvas)
+        velocity = randomDirection
+        life = maxLife
+    Motion Algorithm
+        Each frame:
+            fieldForce = sampleField(position)
+            driftVector = randomWalk()
+            direction = fieldForce + driftVector
+            velocity = normalize(direction) \* speed
+            position += velocity
+
+    Field Sampling
+        Use bilinear interpolation.
+        Steps:
+            1. Find cell indices
+            2. Get 4 surrounding vectors
+            3. Interpolate
+
+Phase 6 — Radar Sampling Optimization
+Bots consider vectors inside radar.
+
+Instead of scanning all:
+
+Use 16 radial samples.
+
+for angle in 16 directions
+sample field
+
+This is fast and stable.
+
+Phase 7 — Path Streaming System
+
+Paths grow continuously.
+
+Memory must remain safe.
+
+Each bot stores:
+
+ArrayList<PVector>
+
+But add point only if:
+
+distance(lastPoint, newPoint) > threshold
+
+Threshold:
+
+1–2 px
+
+This keeps paths compact.
+
+Phase 8 — Adaptive Smoothness Controller
+
+Goal: prevent jitter.
+
+Compute:
+
+angleChange = angle(v_prev, v_current)
+
+Apply smoothing:
+
+v = lerp(v_prev, v_current, smoothingFactor)
+Phase 9 — Stability Supervisor
+
+Monitor:
+
+fieldVariance
+botDensity
+curvatureVariance
+
+If unstable:
+
+reduce drift
+
+reduce magnitude
+
+Phase 10 — Rendering Engine
+
+Draw bot paths.
+
+beginShape()
+for point in path
+vertex()
+endShape()
+
+Bots themselves can be drawn as:
+
+point
+
+circle
+
+triangle (direction indicator)
+
+Phase 11 — Color System
+
+Color options:
+
+Mode 1 — constant
+Mode 2 — opacity based on life
+Mode 3 — global palette cycling
+
+Opacity curve:
+
+fade in
+mid life stable
+fade out
+
+Gaussian style.
+
+Phase 12 — Export System
+
+Export formats:
+
+SVG
+DXF
+
+Paths exported from bot polylines.
+
+Phase 13 — Path Optimization
+
+Two steps.
+
+Step 1 — Point Reduction
+
+Douglas-Peucker algorithm.
+
+Parameter:
+
+epsilon = slider(1–10)
+Step 2 — Travel Optimization
+
+Nearest neighbor ordering.
+
+Goal:
+
+minimize pen travel
+Phase 14 — Topology Preservation
+
+Prevent bad simplifications.
+
+Check:
+
+segment angle
+segment length
+distance thresholds
+
+Protect loops and branches.
+
+Phase 15 — Project Save System
+
+Store:
+
+canvas size
+vector field
+bot parameters
+seed
+background image
+
+JSON file.
+
+Phase 16 — Performance Optimization
+
+Targets:
+
+500 bots
+4000x4000 canvas
+10px grid
+
+Expected:
+
+20–40 fps
+
+Processing P2D handles this well.
+
+Final Architecture Diagram
+User Input
+│
+Brush Engine
+│
+Vector Field
+│
+Ultra Kernel
+│
+Bots Simulation
+│
+Path Streaming
+│
+Rendering Engine
+│
+Optimization
+│
+Vector Export
+Realistic Development Timeline
+
+If coded cleanly:
+
+Phase Time
+Core engine 3–4 days
+Brush system 2 days
+Bots simulation 4 days
+Export system 2 days
+Optimization 2 days
+UI 3 days
+
+Total:
+
+~2 weeks
+
+for a working tool.

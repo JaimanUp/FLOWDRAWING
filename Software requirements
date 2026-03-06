@@ -1,0 +1,343 @@
+Tipo de aplicación
+
+Aplicación de escritorio ejecutada localmente.Inicialmente desarrollada usando la librería Processing, basada en Java.
+
+1. Visión General del Producto
+
+La aplicación es una herramienta de dibujo generativo asistido que permite al usuario crear composiciones gráficas mediante la manipulación de un campo vectorial.
+
+El usuario modifica el campo vectorial mediante trazos de pincel sobre el lienzo. Posteriormente, una serie de agentes autónomos ("bots") se desplazan por el espacio siguiendo las direcciones del campo vectorial y generan trazados gráficos.
+
+El resultado final puede exportarse como imagen raster o como geometría vectorial.
+
+2. Arquitectura Conceptual
+
+El sistema se compone de cinco módulos principales:
+
+Canvas Engine
+
+Vector Field Engine
+
+Brush Interaction Engine
+
+Bot Simulation Engine
+
+Export Engine
+
+3. Interfaz de Usuario
+
+La interfaz se compone de dos zonas principales:
+
+3.1 Menú de Opciones
+
+Dividido en cuatro secciones:
+
+Background
+
+Permite:
+
+seleccionar color de fondo
+
+cargar imagen de referencia
+
+activar o desactivar visualización
+
+Campo Vectorial
+
+Permite configurar:
+
+resolución de la rejilla
+
+visibilidad del campo
+
+modo de visualización
+
+flechas
+
+mapa de flujo
+
+magnitud máxima de vectores
+
+factor global de escala de magnitud
+
+Lienzo
+
+Permite controlar:
+
+herramienta pincel
+
+herramienta borrador
+
+tamaño de pincel
+
+dureza
+
+espaciado
+
+tipo de caída radial
+
+reiniciar campo vectorial
+
+reiniciar trazado
+
+Bots
+
+Permite configurar:
+
+número de bots
+
+vida inicial
+
+radar
+
+dependencia
+
+zozobra
+
+iniciar simulación
+
+detener simulación
+
+reiniciar bots
+
+4. Lienzo de Trabajo
+
+El lienzo tiene cuatro capas visuales:
+
+Background Layer
+
+color o imagen de referencia
+
+Vector Field Layer
+
+visualización opcional del campo vectorial
+
+User Stroke Layer
+
+visualización de trazos del usuario
+
+Bot Trace Layer
+
+trazados generados por bots
+
+El usuario puede:
+
+hacer zoom
+
+hacer pan
+
+La resolución del lienzo es configurable.
+
+5. Campo Vectorial
+5.1 Representación
+
+El campo vectorial se representa como una rejilla regular de vectores.
+
+Cada celda contiene:
+
+vector = (x, y)
+
+donde:
+
+x = componente horizontal
+
+y = componente vertical
+
+5.2 Resolución
+
+La rejilla tiene una resolución configurable.
+
+Valor típico:
+
+1 vector cada 10 píxeles
+5.3 Magnitud
+
+Cada vector tiene:
+
+dirección
+
+magnitud
+
+Existe un parámetro global:
+
+fieldMagnitudeScale
+
+que permite escalar proporcionalmente la magnitud de todos los vectores.
+
+5.4 Límite de magnitud
+
+Existe una magnitud máxima definida:
+
+maxVectorMagnitude
+
+Si el 30% de los vectores alcanza ese valor:
+
+se calcula un factor de reducción
+
+todas las magnitudes se escalan proporcionalmente
+
+Esto evita saturación del campo.
+
+6. Herramienta Pincel
+
+El pincel modifica el campo vectorial.
+
+Cuando el usuario mueve el ratón:
+
+Δmouse = posición_actual − posición_anterior
+
+Para cada vector dentro del radio del pincel:
+
+vector += Δmouse * intensidad_local
+6.1 Parámetros del pincel
+Tamaño
+
+Radio de influencia en el campo vectorial.
+
+Dureza
+
+Controla la caída radial de influencia.
+
+Opciones:
+
+Linear
+
+Gaussian
+
+Hard Edge / Smooth Border
+
+Cada opción corresponde a un tipo de herramienta gráfica.
+
+Espaciado
+
+Controla la frecuencia de muestreo del movimiento del cursor.
+
+Similar al comportamiento en Adobe Photoshop.
+
+7. Herramienta Borrador
+
+El borrador actúa sobre el campo vectorial de forma inversa.
+
+En lugar de añadir desplazamiento:
+
+vector -= Δmouse * intensidad_local
+
+Esto hace que los vectores se aproximen a cero.
+
+8. Bots
+
+Los bots son agentes autónomos que recorren el espacio guiados por el campo vectorial.
+
+8.1 Inicialización
+
+Cuando los bots se activan o reinician:
+
+Cada bot recibe:
+
+posición aleatoria
+
+velocidad inicial aleatoria
+
+vida máxima
+
+8.2 Movimiento
+
+Los bots se mueven en coordenadas continuas.
+
+En cada iteración:
+
+se identifican los vectores dentro del radar
+
+se calcula la influencia ponderada
+
+se calcula dirección resultante
+
+8.3 Radar
+
+El radar define un radio de influencia alrededor del bot.
+
+Todos los vectores dentro del radar influyen en el movimiento.
+
+La influencia depende de:
+
+distancia al bot
+
+función de dependencia
+
+8.4 Dependencia
+
+Define cómo decrece la influencia con la distancia.
+
+Opciones:
+
+Linear
+
+Gaussian
+
+Hard Edge
+
+8.5 Zozobra
+
+Introduce variación aleatoria en el movimiento.
+
+Se implementa como random walk continuo.
+
+La dirección aleatoria cambia progresivamente.
+
+9. Vida de los Bots
+
+Cada bot tiene un valor de vida.
+
+En cada iteración:
+
+si el bot se encuentra sobre un píxel claro del background
+pierde más vida
+
+si se encuentra sobre un píxel oscuro
+pierde menos vida
+
+Cuando la vida llega a cero:
+
+el bot se reinicia
+
+aparece en posición aleatoria
+
+10. Trazado de Bots
+
+Cada bot genera una polilínea continua durante su movimiento.
+
+Los puntos de la polilínea se almacenan en un buffer vectorial.
+
+Este buffer se usa para exportación.
+
+11. Exportación
+
+Se exportan los trazados de bots.
+
+Formatos previstos:
+
+SVG
+
+DXF
+
+También puede exportarse como imagen raster (JPG o PNG).
+
+12. Rendimiento
+
+La prioridad del sistema es calidad sobre tiempo real.
+
+El flujo de trabajo previsto es:
+
+editar campo vectorial
+
+detener edición
+
+ejecutar simulación de bots
+
+exportar resultado
+
+13. Persistencia
+
+En la primera versión no se incluye guardado de proyecto.
+
+La reproducibilidad mediante semillas aleatorias se considera una posible mejora futura.
