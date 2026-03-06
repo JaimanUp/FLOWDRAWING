@@ -176,192 +176,138 @@ Phase 5 — Bot Simulation Engine
             3. Interpolate
 
 Phase 6 — Radar Sampling Optimization
-Bots consider vectors inside radar.
-
-Instead of scanning all:
-
-Use 16 radial samples.
-
-for angle in 16 directions
-sample field
-
-This is fast and stable.
+    Bots consider vectors inside radar.
+    Instead of scanning all:
+    Use 16 radial samples.
+        for angle in 16 directions
+            sample field
+    This is fast and stable.
 
 Phase 7 — Path Streaming System
-
-Paths grow continuously.
-
-Memory must remain safe.
-
-Each bot stores:
-
-ArrayList<PVector>
-
-But add point only if:
-
-distance(lastPoint, newPoint) > threshold
-
-Threshold:
-
-1–2 px
-
-This keeps paths compact.
+    Paths grow continuously.
+    Memory must remain safe.
+    Each bot stores:
+        ArrayList<PVector>
+    But add point only if:
+        distance(lastPoint, newPoint) > threshold
+    Threshold:
+        1–2 px
+    This keeps paths compact.
 
 Phase 8 — Adaptive Smoothness Controller
+    Goal: prevent jitter.
+    Compute:
+        angleChange = angle(v_prev, v_current)
+    Apply smoothing:
+        v = lerp(v_prev, v_current, smoothingFactor)
 
-Goal: prevent jitter.
-
-Compute:
-
-angleChange = angle(v_prev, v_current)
-
-Apply smoothing:
-
-v = lerp(v_prev, v_current, smoothingFactor)
 Phase 9 — Stability Supervisor
-
-Monitor:
-
-fieldVariance
-botDensity
-curvatureVariance
-
-If unstable:
-
-reduce drift
-
-reduce magnitude
+    Monitor:
+        fieldVariance
+        botDensity
+        curvatureVariance
+    If unstable:
+        reduce drift
+        reduce magnitude
 
 Phase 10 — Rendering Engine
+    Draw bot paths.
+        beginShape()
+        for point in path
+            vertex()
+        endShape()
 
-Draw bot paths.
-
-beginShape()
-for point in path
-vertex()
-endShape()
-
-Bots themselves can be drawn as:
-
-point
-
-circle
-
-triangle (direction indicator)
+    Bots themselves can be drawn as:
+        point
+        circle
+        triangle (direction indicator)
 
 Phase 11 — Color System
+    Color options:
+        Mode 1 — constant
+        Mode 2 — opacity based on life
+        Mode 3 — global palette cycling
 
-Color options:
-
-Mode 1 — constant
-Mode 2 — opacity based on life
-Mode 3 — global palette cycling
-
-Opacity curve:
-
-fade in
-mid life stable
-fade out
-
-Gaussian style.
+    Opacity curve:
+        fade in
+        mid life stable
+        fade out
+    Gaussian style.
 
 Phase 12 — Export System
-
-Export formats:
-
-SVG
-DXF
-
-Paths exported from bot polylines.
+    Export formats:
+        SVG
+        DXF
+    Paths exported from bot polylines.
 
 Phase 13 — Path Optimization
+    Two steps.
+        Step 1 — Point Reduction
+            Douglas-Peucker algorithm.
+            Parameter:
+                epsilon = slider(1–10)
+        Step 2 — Travel Optimization
+            Nearest neighbor ordering.
+            Goal:
+                minimize pen travel
 
-Two steps.
-
-Step 1 — Point Reduction
-
-Douglas-Peucker algorithm.
-
-Parameter:
-
-epsilon = slider(1–10)
-Step 2 — Travel Optimization
-
-Nearest neighbor ordering.
-
-Goal:
-
-minimize pen travel
 Phase 14 — Topology Preservation
-
-Prevent bad simplifications.
-
-Check:
-
-segment angle
-segment length
-distance thresholds
-
-Protect loops and branches.
+    Prevent bad simplifications.
+    Check:
+        segment angle
+        segment length
+        distance thresholds
+    Protect loops and branches.
 
 Phase 15 — Project Save System
-
-Store:
-
-canvas size
-vector field
-bot parameters
-seed
-background image
-
-JSON file.
+    Store:
+        canvas size
+        vector field
+        bot parameters
+        seed
+        background image
+    JSON file.
 
 Phase 16 — Performance Optimization
+    Targets:
+        500 bots
+        4000x4000 canvas
+        10px grid
 
-Targets:
+    Expected:
+        20–40 fps
 
-500 bots
-4000x4000 canvas
-10px grid
-
-Expected:
-
-20–40 fps
-
-Processing P2D handles this well.
+    Processing P2D handles this well.
 
 Final Architecture Diagram
-User Input
-│
-Brush Engine
-│
-Vector Field
-│
-Ultra Kernel
-│
-Bots Simulation
-│
-Path Streaming
-│
-Rendering Engine
-│
-Optimization
-│
-Vector Export
+    User Input
+    │
+    Brush Engine
+    │
+    Vector Field
+    │
+    Ultra Kernel
+    │
+    Bots Simulation
+    │
+    Path Streaming
+    │
+    Rendering Engine
+    │
+    Optimization
+    │
+    Vector Export
+
 Realistic Development Timeline
+    If coded cleanly:
+        Phase           Time
+        Core engine       3–4 days
+        Brush system       2 days
+        Bots simulation     4 days
+        Export system       2 days
+        Optimization        2 days
+        UI                  3 days
 
-If coded cleanly:
+        Total:                      ~2 weeks
 
-Phase Time
-Core engine 3–4 days
-Brush system 2 days
-Bots simulation 4 days
-Export system 2 days
-Optimization 2 days
-UI 3 days
-
-Total:
-
-~2 weeks
-
-for a working tool.
+        for a working tool.
