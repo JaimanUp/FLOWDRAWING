@@ -6,7 +6,6 @@
 *.~
 # Processing sketch cache
 **/bin/**
-**/build/**
 **/output/**
 # IDE files
 *.iml
@@ -15,6 +14,14 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Gradle
+.gradle/
+build/
+dist/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
 
 # project resources
 /export/
