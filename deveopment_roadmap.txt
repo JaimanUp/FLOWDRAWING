@@ -1,6 +1,12 @@
 Development Roadmap
 Flow-Guided Generative Drawing Engine
 
+# Prototype Direction
+- This document is targeted at a **quick prototype** using Java and Processing as originally proposed.
+- Core subsystems (vector field, bots, brushes) will follow the designs described below without major deviations.
+- Certain parameters (field normalization threshold, radar sample count) are exposed as configuration, allowing future tuning but not changing the fundamental architecture.
+- Performance targets are aspirational; the initial implementation should focus on correctness and clarity rather than premature optimization.
+
 Phase 0 — Project Setup
     Goal: Create a clean foundation.
 

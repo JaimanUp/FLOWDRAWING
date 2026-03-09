@@ -1,0 +1,21 @@
+# Java/Processing ignores
+*.class
+*.jar
+*.exe
+*.log
+*.~
+# Processing sketch cache
+**/bin/**
+**/build/**
+**/output/**
+# IDE files
+*.iml
+.idea/
+.vscode/
+# OS
+.DS_Store
+Thumbs.db
+
+# project resources
+/export/
+/tmp/
