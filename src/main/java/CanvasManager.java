@@ -46,6 +46,11 @@ public class CanvasManager {
     // Will clear both stroke and bot layers in Phase 4+
   }
   
+  public void resetCanvas() {
+    cameraController.reset();
+    layerRenderer.resetBackground();
+  }
+  
   public void initializeField() {
     // Phase 2: Initialize vector field
   }

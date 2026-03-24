@@ -13,23 +13,55 @@ import java.awt.event.*;
  */
 public class FlowDrawing extends JFrame {
   private CanvasPanel canvasPanel;
-  private static final int WINDOW_WIDTH = 800;
-  private static final int WINDOW_HEIGHT = 600;
+  private ui.UIPanel uiPanel;
+  private static final int WINDOW_WIDTH = 1000;
+  private static final int WINDOW_HEIGHT = 700;
 
   public static void main(String[] args) {
     SwingUtilities.invokeLater(() -> new FlowDrawing());
   }
 
   public FlowDrawing() {
-    setTitle("Flow-Guided Generative Drawing Engine");
+    setTitle("Flow-Guided Generative Drawing Engine - Phase 1");
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
     setLocationRelativeTo(null);
     setResizable(true);
 
     // Create canvas panel
-    canvasPanel = new CanvasPanel(WINDOW_WIDTH, WINDOW_HEIGHT);
-    add(canvasPanel);
+    canvasPanel = new CanvasPanel(WINDOW_WIDTH - 20, WINDOW_HEIGHT - 100);
+    
+    // Create UI panel with listener
+    uiPanel = new ui.UIPanel(new ui.UIPanel.UIListener() {
+      @Override
+      public void onResetCanvas() {
+        canvasPanel.resetCanvas();
+        uiPanel.setStatus("Canvas reset");
+      }
+
+      @Override
+      public void onClearStrokes() {
+        canvasPanel.clearStrokes();
+        uiPanel.setStatus("Strokes cleared");
+      }
+
+      @Override
+      public void onClearBots() {
+        canvasPanel.clearBots();
+        uiPanel.setStatus("Bots cleared");
+      }
+
+      @Override
+      public void onVectorFieldToggle(boolean show) {
+        canvasPanel.setShowVectorField(show);
+        uiPanel.setStatus(show ? "Vector field ON" : "Vector field OFF");
+      }
+    });
+
+    // Layout
+    setLayout(new BorderLayout());
+    add(uiPanel, BorderLayout.NORTH);
+    add(canvasPanel, BorderLayout.CENTER);
 
     setVisible(true);
   }
@@ -44,8 +76,12 @@ public class FlowDrawing extends JFrame {
     private long lastFrameTime;
     private double fps = 0;
     private int lastMouseX, lastMouseY;
+    private int canvasWidth;
+    private int canvasHeight;
 
     public CanvasPanel(int width, int height) {
+      this.canvasWidth = width;
+      this.canvasHeight = height;
       setPreferredSize(new Dimension(width, height));
       setBackground(Color.WHITE);
       setFocusable(true);
@@ -102,6 +138,12 @@ public class FlowDrawing extends JFrame {
     @Override
     public void run() {
       while (running) {
+        // Handle resizing
+        if (getWidth() != canvasWidth || getHeight() != canvasHeight) {
+          canvasWidth = getWidth();
+          canvasHeight = getHeight();
+          layerRenderer.resizeLayers(canvasWidth, canvasHeight);
+        }
         repaint();
         try {
           Thread.sleep(16); // ~60 FPS
@@ -109,6 +151,30 @@ public class FlowDrawing extends JFrame {
           break;
         }
       }
+    }
+    
+    public void resetCanvas() {
+      cameraController.reset();
+      layerRenderer.resetBackground();
+      layerRenderer.clearVectorField();
+      layerRenderer.clearStrokes();
+      layerRenderer.clearBots();
+      repaint();
+    }
+    
+    public void clearStrokes() {
+      layerRenderer.clearStrokes();
+      repaint();
+    }
+    
+    public void clearBots() {
+      layerRenderer.clearBots();
+      repaint();
+    }
+    
+    public void setShowVectorField(boolean show) {
+      layerRenderer.setShowVectorField(show);
+      repaint();
     }
 
     @Override
