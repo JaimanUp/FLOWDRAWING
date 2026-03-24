@@ -43,8 +43,7 @@ public class CanvasManager {
   
   // Canvas operations (stubs for future phases)
   public void clearAll() {
-    layerRenderer.clearStrokes();
-    layerRenderer.clearBots();
+    // Will clear both stroke and bot layers in Phase 4+
   }
   
   public void initializeField() {

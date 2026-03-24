@@ -8,19 +8,11 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.processing:core:4.3'
+    // No external dependencies - using Java built-in graphics (Swing)
 }
 
 application {
     mainClass = 'FlowDrawing'
-}
-
-tasks.register('run', JavaExec) {
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'FlowDrawing'
-    
-    // Pass System properties if needed
-    systemProperties System.properties
 }
 
 java {
