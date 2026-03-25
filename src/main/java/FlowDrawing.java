@@ -22,7 +22,7 @@ public class FlowDrawing extends JFrame {
   }
 
   public FlowDrawing() {
-    setTitle("Flow-Guided Generative Drawing Engine - Phase 2 | Controls: SPACE+Drag=Pan | SPACE/CTRL+Wheel=Zoom | R=Reset");
+    setTitle("Flow-Guided Generative Drawing Engine - Phase 2 | Controls: MiddleClick+Drag=Pan | Scroll=Zoom | R=Reset");
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
     setLocationRelativeTo(null);
@@ -78,7 +78,7 @@ public class FlowDrawing extends JFrame {
     private int lastMouseX, lastMouseY;
     private int canvasWidth;
     private int canvasHeight;
-    private volatile boolean spacePressed = false;
+    private volatile boolean middleMousePressed = false;
 
     public CanvasPanel(int width, int height) {
       this.canvasWidth = width;
@@ -98,14 +98,25 @@ public class FlowDrawing extends JFrame {
         public void mousePressed(MouseEvent e) {
           lastMouseX = e.getX();
           lastMouseY = e.getY();
+          // Detect middle mouse button (scroll button)
+          if (e.getButton() == MouseEvent.BUTTON2) {
+            middleMousePressed = true;
+          }
+        }
+
+        @Override
+        public void mouseReleased(MouseEvent e) {
+          if (e.getButton() == MouseEvent.BUTTON2) {
+            middleMousePressed = false;
+          }
         }
       });
 
       addMouseMotionListener(new MouseMotionAdapter() {
         @Override
         public void mouseDragged(MouseEvent e) {
-          // Pan only when space bar is held
-          if (spacePressed) {
+          // Pan only when middle mouse button is pressed
+          if (middleMousePressed) {
             int dx = lastMouseX - e.getX();
             int dy = lastMouseY - e.getY();
             cameraController.pan(dx, dy);
@@ -117,29 +128,18 @@ public class FlowDrawing extends JFrame {
       });
 
       addMouseWheelListener(e -> {
-        // Zoom when space or Ctrl is held, or always allow zoom
-        if (spacePressed || (e.getModifiersEx() & java.awt.event.InputEvent.CTRL_DOWN_MASK) != 0) {
-          float factor = e.getWheelRotation() > 0 ? 0.9f : 1.1f;
-          cameraController.zoom(factor);
-          repaint();
-        }
+        // Zoom: down = zoom out, up = zoom in
+        float factor = e.getWheelRotation() > 0 ? 0.9f : 1.1f;
+        cameraController.zoom(factor);
+        repaint();
       });
 
       addKeyListener(new KeyAdapter() {
         @Override
         public void keyPressed(KeyEvent e) {
-          if (e.getKeyCode() == KeyEvent.VK_SPACE) {
-            spacePressed = true;
-          } else if (e.getKeyChar() == 'r' || e.getKeyChar() == 'R') {
+          if (e.getKeyChar() == 'r' || e.getKeyChar() == 'R') {
             cameraController.reset();
             repaint();
-          }
-        }
-
-        @Override
-        public void keyReleased(KeyEvent e) {
-          if (e.getKeyCode() == KeyEvent.VK_SPACE) {
-            spacePressed = false;
           }
         }
       });
