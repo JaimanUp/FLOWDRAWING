@@ -1,6 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import field.VectorField;
 
 /**
  * Flow-Guided Generative Drawing Engine
@@ -55,6 +56,12 @@ public class FlowDrawing extends JFrame {
       public void onVectorFieldToggle(boolean show) {
         canvasPanel.setShowVectorField(show);
         uiPanel.setStatus(show ? "Vector field ON" : "Vector field OFF");
+      }
+      
+      @Override
+      public void onClearVectorField() {
+        canvasPanel.clearVectorField();
+        uiPanel.setStatus("Vector field cleared");
       }
       
       @Override
@@ -130,8 +137,11 @@ public class FlowDrawing extends JFrame {
           // Detect left mouse button for painting
           else if (e.getButton() == MouseEvent.BUTTON1) {
             leftMousePressed = true;
-            // Start brush stroke
-            brushEngine.startStroke(e.getX(), e.getY());
+            // Start brush stroke with world coordinates
+            java.awt.geom.Point2D.Float worldCoords = cameraController.screenToWorld(
+              e.getX(), e.getY(), canvasWidth, canvasHeight
+            );
+            brushEngine.startStroke(worldCoords.x, worldCoords.y);
           }
         }
 
@@ -160,7 +170,11 @@ public class FlowDrawing extends JFrame {
           }
           // Paint when left mouse is pressed
           else if (leftMousePressed) {
-            brushEngine.paintAt(e.getX(), e.getY());
+            // Convert screen coordinates to world coordinates for brush
+            java.awt.geom.Point2D.Float worldCoords = cameraController.screenToWorld(
+              e.getX(), e.getY(), canvasWidth, canvasHeight
+            );
+            brushEngine.paintAt(worldCoords.x, worldCoords.y);
             repaint();
           }
           lastMouseX = e.getX();
@@ -202,7 +216,11 @@ public class FlowDrawing extends JFrame {
           canvasWidth = currentWidth;
           canvasHeight = currentHeight;
           layerRenderer.resizeLayers(canvasWidth, canvasHeight);
-          canvasManager = new CanvasManager(canvasWidth, canvasHeight, cameraController, layerRenderer);
+          // Update brush engine with new field reference
+          VectorField newField = layerRenderer.getVectorField();
+          if (newField != null && brushEngine != null) {
+            brushEngine = new brush.BrushEngine(brush, newField);
+          }
         }
         repaint();
         try {
@@ -214,11 +232,17 @@ public class FlowDrawing extends JFrame {
     }
     
     public void resetCanvas() {
+      // Reset only camera transforms, NOT the vector field data
       cameraController.reset();
       layerRenderer.resetBackground();
-      layerRenderer.clearVectorField();
       layerRenderer.clearStrokes();
       layerRenderer.clearBots();
+      repaint();
+    }
+    
+    public void clearVectorField() {
+      // Explicitly clear only the vector field
+      layerRenderer.clearVectorField();
       repaint();
     }
     

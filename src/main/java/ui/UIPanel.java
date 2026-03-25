@@ -37,6 +37,7 @@ public class UIPanel extends JPanel {
     void onResetCanvas();
     void onClearStrokes();
     void onClearBots();
+    void onClearVectorField();
     void onVectorFieldToggle(boolean show);
     void onBrushSizeChanged(float size);
     void onBrushHardnessChanged(float hardness);
@@ -86,6 +87,15 @@ public class UIPanel extends JPanel {
       }
     });
     add(clearBotsButton);
+    
+    // Clear vector field button
+    JButton clearVectorFieldButton = new JButton("Clear Field");
+    clearVectorFieldButton.addActionListener(e -> {
+      if (uiListener != null) {
+        uiListener.onClearVectorField();
+      }
+    });
+    add(clearVectorFieldButton);
     
     add(new JSeparator(JSeparator.VERTICAL));
     

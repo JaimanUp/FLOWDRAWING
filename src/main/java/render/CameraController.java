@@ -2,6 +2,7 @@ package render;
 
 import java.awt.geom.AffineTransform;
 import java.awt.Graphics2D;
+import java.awt.geom.Point2D;
 
 /**
  * CameraController
@@ -58,5 +59,33 @@ public class CameraController {
   
   public float getPanY() {
     return panY;
+  }
+  
+  /**
+   * Convert screen space coordinates to world space coordinates.
+   * Used for brush painting with camera transforms (zoom/pan).
+   */
+  public java.awt.geom.Point2D.Float screenToWorld(float screenX, float screenY, int w, int h) {
+    try {
+      // Build the inverse transform
+      AffineTransform transform = new AffineTransform();
+      transform.translate(panX, panY);
+      transform.translate(w / 2.0f, h / 2.0f);
+      transform.scale(zoomLevel, zoomLevel);
+      transform.translate(-w / 2.0f, -h / 2.0f);
+      
+      // Invert it
+      AffineTransform inverse = transform.createInverse();
+      
+      // Transform screen coordinates to world coordinates
+      java.awt.geom.Point2D.Float screenPoint = new java.awt.geom.Point2D.Float(screenX, screenY);
+      java.awt.geom.Point2D.Float worldPoint = new java.awt.geom.Point2D.Float();
+      inverse.transform(screenPoint, worldPoint);
+      
+      return worldPoint;
+    } catch (java.awt.geom.NoninvertibleTransformException e) {
+      // Fallback: return screen coordinates if transform is singular
+      return new java.awt.geom.Point2D.Float(screenX, screenY);
+    }
   }
 }

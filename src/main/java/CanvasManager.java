@@ -14,24 +14,21 @@ public class CanvasManager {
   private int canvasHeight;
   private CameraController cameraController;
   private LayerRenderer layerRenderer;
-  private VectorField vectorField;
-  private FieldRenderer fieldRenderer;
   
   public CanvasManager(int w, int h, CameraController cam, LayerRenderer renderer) {
     this.canvasWidth = w;
     this.canvasHeight = h;
     this.cameraController = cam;
     this.layerRenderer = renderer;
-    
-    // Initialize Phase 2: Vector Field Engine
-    this.vectorField = new VectorField(w, h, Config.CELL_SIZE);
-    this.fieldRenderer = new FieldRenderer(vectorField);
   }
   
   public void update() {
     // Main update loop placeholder
     // Phase 2: Field normalization on demand
-    vectorField.normalizeFieldIfNeeded();
+    VectorField field = getVectorField();
+    if (field != null) {
+      field.normalizeFieldIfNeeded();
+    }
   }
   
   // Accessors
@@ -52,11 +49,12 @@ public class CanvasManager {
   }
   
   public VectorField getVectorField() {
-    return vectorField;
+    // Get field from LayerRenderer (source of truth)
+    return layerRenderer.getVectorField();
   }
   
   public FieldRenderer getFieldRenderer() {
-    return fieldRenderer;
+    return layerRenderer.getFieldRenderer();
   }
   
   // Canvas operations (stubs for future phases)
@@ -67,16 +65,25 @@ public class CanvasManager {
   public void resetCanvas() {
     cameraController.reset();
     layerRenderer.resetBackground();
-    vectorField.clear();
+    VectorField field = getVectorField();
+    if (field != null) {
+      field.clear();
+    }
   }
   
   public void clearVectorField() {
-    vectorField.clear();
+    VectorField field = getVectorField();
+    if (field != null) {
+      field.clear();
+    }
   }
   
   public void initializeField() {
-    // Phase 2: Vector field already initialized in constructor
-    vectorField.clear();
+    // Phase 2: Vector field already initialized in LayerRenderer
+    VectorField field = getVectorField();
+    if (field != null) {
+      field.clear();
+    }
   }
   
   public void startSimulation() {
