@@ -1,13 +1,16 @@
 package ui;
 
 import javax.swing.*;
+import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionListener;
 
 /**
  * UIPanel
- * Basic control panel for Phase 1 canvas system.
- * Allows toggling vector field visibility and resetting canvas.
+ * Control panel for canvas, vector field, and brush tools.
+ * Phase 1: Canvas controls
+ * Phase 2: Vector field visualization
+ * Phase 4: Brush size, hardness, strength controls
  */
 public class UIPanel extends JPanel {
   private JCheckBox showVectorFieldCheckBox;
@@ -16,9 +19,18 @@ public class UIPanel extends JPanel {
   private JButton clearBotsButton;
   private JLabel statusLabel;
   
+  // Phase 4: Brush controls
+  private JSlider brushSizeSlider;
+  private JSlider brushHardnessSlider;
+  private JSlider brushStrengthSlider;
+  private JLabel brushSizeLabel;
+  private JLabel brushHardnessLabel;
+  private JLabel brushStrengthLabel;
+  
   private ActionListener resetCanvasListener;
   private ActionListener clearStrokesListener;
   private ActionListener clearBotsListener;
+  private ChangeListener brushChangeListener;
   private UIListener uiListener;
   
   public interface UIListener {
@@ -26,6 +38,9 @@ public class UIPanel extends JPanel {
     void onClearStrokes();
     void onClearBots();
     void onVectorFieldToggle(boolean show);
+    void onBrushSizeChanged(float size);
+    void onBrushHardnessChanged(float hardness);
+    void onBrushStrengthChanged(float strength);
   }
   
   public UIPanel(UIListener listener) {
@@ -71,6 +86,51 @@ public class UIPanel extends JPanel {
       }
     });
     add(clearBotsButton);
+    
+    add(new JSeparator(JSeparator.VERTICAL));
+    
+    // Phase 4: Brush controls
+    brushSizeLabel = new JLabel("Size: 30");
+    add(brushSizeLabel);
+    
+    brushSizeSlider = new JSlider(JSlider.HORIZONTAL, 5, 100, 30);
+    brushSizeSlider.setPreferredSize(new Dimension(100, 40));
+    brushSizeSlider.addChangeListener(e -> {
+      float size = brushSizeSlider.getValue();
+      brushSizeLabel.setText(String.format("Size: %.0f", size));
+      if (uiListener != null) {
+        uiListener.onBrushSizeChanged(size);
+      }
+    });
+    add(brushSizeSlider);
+    
+    brushHardnessLabel = new JLabel("Hard: 0.50");
+    add(brushHardnessLabel);
+    
+    brushHardnessSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, 50);
+    brushHardnessSlider.setPreferredSize(new Dimension(80, 40));
+    brushHardnessSlider.addChangeListener(e -> {
+      float hardness = brushHardnessSlider.getValue() / 100.0f;
+      brushHardnessLabel.setText(String.format("Hard: %.2f", hardness));
+      if (uiListener != null) {
+        uiListener.onBrushHardnessChanged(hardness);
+      }
+    });
+    add(brushHardnessSlider);
+    
+    brushStrengthLabel = new JLabel("Str: 2.0");
+    add(brushStrengthLabel);
+    
+    brushStrengthSlider = new JSlider(JSlider.HORIZONTAL, 1, 50, 20);
+    brushStrengthSlider.setPreferredSize(new Dimension(80, 40));
+    brushStrengthSlider.addChangeListener(e -> {
+      float strength = brushStrengthSlider.getValue() / 10.0f;
+      brushStrengthLabel.setText(String.format("Str: %.1f", strength));
+      if (uiListener != null) {
+        uiListener.onBrushStrengthChanged(strength);
+      }
+    });
+    add(brushStrengthSlider);
     
     add(new JSeparator(JSeparator.VERTICAL));
     

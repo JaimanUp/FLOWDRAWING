@@ -22,7 +22,7 @@ public class FlowDrawing extends JFrame {
   }
 
   public FlowDrawing() {
-    setTitle("Flow-Guided Generative Drawing Engine - Phase 2 | Controls: MiddleClick+Drag=Pan | Scroll=Zoom | R=Reset");
+    setTitle("Flow-Guided Generative Drawing Engine - Phase 4 | MiddleClick+Drag=Pan | Scroll=Zoom | R=Reset | LeftClick=Paint");
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
     setLocationRelativeTo(null);
@@ -56,6 +56,21 @@ public class FlowDrawing extends JFrame {
         canvasPanel.setShowVectorField(show);
         uiPanel.setStatus(show ? "Vector field ON" : "Vector field OFF");
       }
+      
+      @Override
+      public void onBrushSizeChanged(float size) {
+        canvasPanel.getBrush().setSize(size);
+      }
+      
+      @Override
+      public void onBrushHardnessChanged(float hardness) {
+        canvasPanel.getBrush().setHardness(hardness);
+      }
+      
+      @Override
+      public void onBrushStrengthChanged(float strength) {
+        canvasPanel.getBrush().setStrength(strength);
+      }
     });
 
     // Layout
@@ -79,6 +94,11 @@ public class FlowDrawing extends JFrame {
     private int canvasWidth;
     private int canvasHeight;
     private volatile boolean middleMousePressed = false;
+    
+    // Phase 4: Brush system
+    private brush.Brush brush;
+    private brush.BrushEngine brushEngine;
+    private volatile boolean leftMousePressed = false;
 
     public CanvasPanel(int width, int height) {
       this.canvasWidth = width;
@@ -91,6 +111,10 @@ public class FlowDrawing extends JFrame {
       cameraController = new render.CameraController(width, height);
       layerRenderer = new render.LayerRenderer(width, height);
       canvasManager = new CanvasManager(width, height, cameraController, layerRenderer);
+      
+      // Phase 4: Initialize brush system
+      brush = new brush.Brush();
+      brushEngine = new brush.BrushEngine(brush, canvasManager.getVectorField());
 
       // Add mouse listeners
       addMouseListener(new MouseAdapter() {
@@ -98,9 +122,16 @@ public class FlowDrawing extends JFrame {
         public void mousePressed(MouseEvent e) {
           lastMouseX = e.getX();
           lastMouseY = e.getY();
-          // Detect middle mouse button (scroll button)
+          
+          // Detect middle mouse button (scroll button) for panning
           if (e.getButton() == MouseEvent.BUTTON2) {
             middleMousePressed = true;
+          }
+          // Detect left mouse button for painting
+          else if (e.getButton() == MouseEvent.BUTTON1) {
+            leftMousePressed = true;
+            // Start brush stroke
+            brushEngine.startStroke(e.getX(), e.getY());
           }
         }
 
@@ -109,17 +140,27 @@ public class FlowDrawing extends JFrame {
           if (e.getButton() == MouseEvent.BUTTON2) {
             middleMousePressed = false;
           }
+          // End brush stroke on left mouse release
+          else if (e.getButton() == MouseEvent.BUTTON1) {
+            leftMousePressed = false;
+            brushEngine.endStroke();
+          }
         }
       });
 
       addMouseMotionListener(new MouseMotionAdapter() {
         @Override
         public void mouseDragged(MouseEvent e) {
-          // Pan only when middle mouse button is pressed
+          // Pan when middle mouse is pressed
           if (middleMousePressed) {
             int dx = lastMouseX - e.getX();
             int dy = lastMouseY - e.getY();
             cameraController.pan(dx, dy);
+            repaint();
+          }
+          // Paint when left mouse is pressed
+          else if (leftMousePressed) {
+            brushEngine.paintAt(e.getX(), e.getY());
             repaint();
           }
           lastMouseX = e.getX();
@@ -194,6 +235,15 @@ public class FlowDrawing extends JFrame {
     public void setShowVectorField(boolean show) {
       layerRenderer.setShowVectorField(show);
       repaint();
+    }
+    
+    // Phase 4: Brush accessors
+    public brush.Brush getBrush() {
+      return brush;
+    }
+    
+    public brush.BrushEngine getBrushEngine() {
+      return brushEngine;
     }
 
     @Override
