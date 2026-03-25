@@ -4,6 +4,7 @@ import java.awt.Graphics2D;
 import java.awt.Color;
 import java.awt.BasicStroke;
 import java.awt.image.BufferedImage;
+import field.VectorField;
 
 /**
  * LayerRenderer
@@ -24,6 +25,8 @@ public class LayerRenderer {
   private int canvasWidth;
   private int canvasHeight;
   private boolean showVectorField = false;
+  private FieldRenderer fieldRenderer;
+  private VectorField vectorField;
   
   public LayerRenderer(int w, int h) {
     this.canvasWidth = w;
@@ -37,6 +40,10 @@ public class LayerRenderer {
     
     // Initialize background with default color
     initializeBackground();
+    
+    // Initialize Phase 2 field rendering
+    this.vectorField = new VectorField(w, h, 10.0f);
+    this.fieldRenderer = new FieldRenderer(vectorField);
   }
   
   private void initializeBackground() {
@@ -66,14 +73,26 @@ public class LayerRenderer {
     
     canvasWidth = newWidth;
     canvasHeight = newHeight;
+    
+    // Phase 2: Resize field renderer and vector field
+    vectorField = new VectorField(newWidth, newHeight, 10.0f);
+    fieldRenderer = new FieldRenderer(vectorField);
   }
   
   public void render(Graphics2D g2d, int w, int h) {
     // Render background layer
     g2d.drawImage(backgroundLayer, 0, 0, null);
     
-    // Render vector field layer (optional)
+    // Render vector field layer (optional, Phase 3)
     if (showVectorField) {
+      // Render field onto the vector field layer
+      Graphics2D fieldG2d = vectorFieldLayer.createGraphics();
+      fieldG2d.setComposite(java.awt.AlphaComposite.Clear);
+      fieldG2d.fillRect(0, 0, canvasWidth, canvasHeight);
+      fieldG2d.setComposite(java.awt.AlphaComposite.SrcOver);
+      fieldRenderer.render(fieldG2d, null);  // CameraController passed as null for now
+      fieldG2d.dispose();
+      
       g2d.drawImage(vectorFieldLayer, 0, 0, null);
     }
     
@@ -121,6 +140,11 @@ public class LayerRenderer {
     g2d.setComposite(java.awt.AlphaComposite.Clear);
     g2d.fillRect(0, 0, canvasWidth, canvasHeight);
     g2d.dispose();
+    
+    // Phase 2: Also clear the underlying vector field data
+    if (vectorField != null) {
+      vectorField.clear();
+    }
   }
   
   public void resetBackground() {
@@ -144,5 +168,14 @@ public class LayerRenderer {
   
   public int getHeight() {
     return canvasHeight;
+  }
+  
+  // Phase 2: Getters for field access
+  public VectorField getVectorField() {
+    return vectorField;
+  }
+  
+  public FieldRenderer getFieldRenderer() {
+    return fieldRenderer;
   }
 }

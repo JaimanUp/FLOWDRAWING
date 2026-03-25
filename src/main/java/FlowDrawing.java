@@ -138,11 +138,15 @@ public class FlowDrawing extends JFrame {
     @Override
     public void run() {
       while (running) {
-        // Handle resizing
-        if (getWidth() != canvasWidth || getHeight() != canvasHeight) {
-          canvasWidth = getWidth();
-          canvasHeight = getHeight();
+        // Handle resizing (skip if component not yet laid out)
+        int currentWidth = getWidth();
+        int currentHeight = getHeight();
+        if (currentWidth > 0 && currentHeight > 0 && 
+            (currentWidth != canvasWidth || currentHeight != canvasHeight)) {
+          canvasWidth = currentWidth;
+          canvasHeight = currentHeight;
           layerRenderer.resizeLayers(canvasWidth, canvasHeight);
+          canvasManager = new CanvasManager(canvasWidth, canvasHeight, cameraController, layerRenderer);
         }
         repaint();
         try {
