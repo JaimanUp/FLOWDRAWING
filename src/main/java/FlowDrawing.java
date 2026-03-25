@@ -22,7 +22,7 @@ public class FlowDrawing extends JFrame {
   }
 
   public FlowDrawing() {
-    setTitle("Flow-Guided Generative Drawing Engine - Phase 1");
+    setTitle("Flow-Guided Generative Drawing Engine - Phase 2 | Controls: SPACE+Drag=Pan | SPACE/CTRL+Wheel=Zoom | R=Reset");
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
     setLocationRelativeTo(null);
@@ -78,6 +78,7 @@ public class FlowDrawing extends JFrame {
     private int lastMouseX, lastMouseY;
     private int canvasWidth;
     private int canvasHeight;
+    private volatile boolean spacePressed = false;
 
     public CanvasPanel(int width, int height) {
       this.canvasWidth = width;
@@ -103,28 +104,42 @@ public class FlowDrawing extends JFrame {
       addMouseMotionListener(new MouseMotionAdapter() {
         @Override
         public void mouseDragged(MouseEvent e) {
-          int dx = lastMouseX - e.getX();
-          int dy = lastMouseY - e.getY();
-          cameraController.pan(dx, dy);
+          // Pan only when space bar is held
+          if (spacePressed) {
+            int dx = lastMouseX - e.getX();
+            int dy = lastMouseY - e.getY();
+            cameraController.pan(dx, dy);
+            repaint();
+          }
           lastMouseX = e.getX();
           lastMouseY = e.getY();
-          repaint();
         }
       });
 
       addMouseWheelListener(e -> {
-        // Reverse: down = zoom out, up = zoom in
-        float factor = e.getWheelRotation() > 0 ? 0.9f : 1.1f;
-        cameraController.zoom(factor);
-        repaint();
+        // Zoom when space or Ctrl is held, or always allow zoom
+        if (spacePressed || (e.getModifiersEx() & java.awt.event.InputEvent.CTRL_DOWN_MASK) != 0) {
+          float factor = e.getWheelRotation() > 0 ? 0.9f : 1.1f;
+          cameraController.zoom(factor);
+          repaint();
+        }
       });
 
       addKeyListener(new KeyAdapter() {
         @Override
         public void keyPressed(KeyEvent e) {
-          if (e.getKeyChar() == 'r' || e.getKeyChar() == 'R') {
+          if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+            spacePressed = true;
+          } else if (e.getKeyChar() == 'r' || e.getKeyChar() == 'R') {
             cameraController.reset();
             repaint();
+          }
+        }
+
+        @Override
+        public void keyReleased(KeyEvent e) {
+          if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+            spacePressed = false;
           }
         }
       });
