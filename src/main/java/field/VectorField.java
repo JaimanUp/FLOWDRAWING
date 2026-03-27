@@ -1,5 +1,9 @@
 package field;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+
 /**
  * VectorField
  * Represents a 2D grid of vectors that guides bot movement.
@@ -72,6 +76,12 @@ public class VectorField {
     int centerGY = (int) (centerY / cellSize);
     int radiusInCells = (int) Math.ceil(radius / cellSize);
     
+    // Normalize force by radius so center impact is independent of brush size
+    // Larger brush = smaller force per unit area, but same center impact
+    float normalizedForce = (radius > 0) ? 1.0f / (radius * 0.1f) : 1.0f;
+    float normalizedFx = fx * normalizedForce;
+    float normalizedFy = fy * normalizedForce;
+    
     for (int gx = centerGX - radiusInCells; gx <= centerGX + radiusInCells; gx++) {
       for (int gy = centerGY - radiusInCells; gy <= centerGY + radiusInCells; gy++) {
         if (gx >= 0 && gx < cols && gy >= 0 && gy < rows) {
@@ -81,7 +91,7 @@ public class VectorField {
           
           if (dist < radius) {
             float factor = calculateFalloff(dist, radius, falloff);
-            vectors[gx][gy].add(fx * factor, fy * factor);
+            vectors[gx][gy].add(normalizedFx * factor, normalizedFy * factor);
             vectors[gx][gy].clamp(maxMagnitude);
           }
         }
@@ -133,6 +143,7 @@ public class VectorField {
     float percentAtMax = (float) countAtMax / totalVectors;
     
     if (percentAtMax >= normalizationThreshold) {
+      float[] sumBefore = sumVectors();
       // Scale all vectors proportionally
       if (maxMag > maxMagnitude) {
         float scaleFactor = maxMagnitude / maxMag;
@@ -141,6 +152,8 @@ public class VectorField {
             vectors[x][y].scale(scaleFactor);
           }
         }
+        float[] sumAfter = sumVectors();
+        logNormalizationWithSums(percentAtMax, maxMag, scaleFactor, sumBefore, sumAfter);
       }
     }
   }
@@ -157,9 +170,47 @@ public class VectorField {
     }
   }
   
+  private void logNormalization(float percentAtMax, float maxMag, float scaleFactor) {
+    try (FileWriter fw = new FileWriter("normalization_log.txt", true)) {
+      fw.write(String.format("%s - Normalization triggered: percentAtMax=%.3f, maxMag=%.3f, scaleFactor=%.3f\n",
+        LocalDateTime.now(), percentAtMax, maxMag, scaleFactor));
+    } catch (IOException e) {
+      // Ignore logging errors
+    }
+  }
+  
+  private void logNormalizationWithSums(float percentAtMax, float maxMag, float scaleFactor, float[] sumBefore, float[] sumAfter) {
+    try (FileWriter fw = new FileWriter("normalization_log.txt", true)) {
+      fw.write(String.format("%s - Normalization: percentAtMax=%.3f, maxMag=%.3f, scaleFactor=%.3f\n",
+        LocalDateTime.now(), percentAtMax, maxMag, scaleFactor));
+      fw.write(String.format("  Sum before: vx=%.3f, vy=%.3f\n", sumBefore[0], sumBefore[1]));
+      fw.write(String.format("  Sum after:  vx=%.3f, vy=%.3f\n", sumAfter[0], sumAfter[1]));
+    } catch (IOException e) {
+      // Ignore logging errors
+    }
+  }
+  
+  private float[] sumVectors() {
+    float sumX = 0, sumY = 0;
+    for (int x = 0; x < cols; x++) {
+      for (int y = 0; y < rows; y++) {
+        sumX += vectors[x][y].vx;
+        sumY += vectors[x][y].vy;
+      }
+    }
+    return new float[]{sumX, sumY};
+  }
+  
   // ========== Getters ==========
   public Vector2D[][] getVectors() {
     return vectors;
+  }
+  
+  public Vector2D getVector(int x, int y) {
+    if (x >= 0 && x < cols && y >= 0 && y < rows) {
+      return vectors[x][y];
+    }
+    return new Vector2D(0, 0);  // Return zero vector for out-of-bounds
   }
   
   public float getCellSize() {

@@ -35,6 +35,55 @@ public class CameraController {
     zoomLevel = Math.max(0.1f, Math.min(10.0f, zoomLevel));
   }
   
+  /**
+   * Set zoom level directly.
+   * Used for fit-to-window operations.
+   */
+  public void setZoom(float level) {
+    zoomLevel = Math.max(0.1f, Math.min(10.0f, level));
+  }
+  
+  /**
+   * Zoom centered on a specific mouse position in screen space.
+   * Keeps the exact world position under the mouse cursor fixed.
+   * 
+   * Correct formula for zoom-to-point:
+   * If a world point maps to screen position before zoom, after zoom
+   * we adjust pan so the SAME world point maps to the SAME screen position.
+   * 
+   * The screen transform is: screen = (world - canvasCenter) * zoom + canvasCenter + pan
+   * 
+   * Rearranging for pan after zoom:
+   * panX_new = panX_old + (screenX - canvasCenter.x - panX_old) * (1 - zoomNew/zoomOld)
+   * 
+   * @param factor Zoom factor (1.1 = zoom in, 0.9 = zoom out)
+   * @param screenX Mouse X in screen coordinates (relative to canvas)
+   * @param screenY Mouse Y in screen coordinates (relative to canvas)
+   * @param canvasW Canvas width in pixels
+   * @param canvasH Canvas height in pixels
+   */
+  public void zoomAtMouse(float factor, int screenX, int screenY, int canvasW, int canvasH) {
+    // Store old zoom
+    float oldZoom = zoomLevel;
+    
+    // Apply zoom
+    zoomLevel *= factor;
+    zoomLevel = Math.max(0.1f, Math.min(10.0f, zoomLevel));
+    float newZoom = zoomLevel;
+    
+    // Canvas center
+    float centerX = canvasW / 2.0f;
+    float centerY = canvasH / 2.0f;
+    
+    // Zoom ratio
+    float zoomRatio = newZoom / oldZoom;
+    
+    // Adjust pan to keep screen point fixed
+    // Formula: pan_new = pan_old + (screen - center - pan_old) * (1 - zoomRatio)
+    panX = panX + (screenX - centerX - panX) * (1 - zoomRatio);
+    panY = panY + (screenY - centerY - panY) * (1 - zoomRatio);
+  }
+  
   public void reset() {
     zoomLevel = 1.0f;
     panX = 0;

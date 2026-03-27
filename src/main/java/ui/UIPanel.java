@@ -14,6 +14,7 @@ import java.awt.event.ActionListener;
  */
 public class UIPanel extends JPanel {
   private JCheckBox showVectorFieldCheckBox;
+  private JCheckBox showStrokesCheckBox;
   private JButton resetCanvasButton;
   private JButton clearStrokesButton;
   private JButton clearBotsButton;
@@ -27,6 +28,25 @@ public class UIPanel extends JPanel {
   private JLabel brushHardnessLabel;
   private JLabel brushStrengthLabel;
   
+  // Phase 5: Bot controls
+  private JButton spawnBotButton;
+  private JCheckBox autoSpawnCheckBox;
+  private JSlider botSpawnRateSlider;
+  private JLabel botSpawnRateLabel;
+  private JSlider botLifeSlider;
+  private JLabel botLifeLabel;
+  private JSlider botRadarSlider;
+  private JLabel botRadarLabel;
+  private JSlider botDriftSlider;
+  private JLabel botDriftLabel;
+  private JSlider botSpeedSlider;
+  private JLabel botSpeedLabel;
+  
+  // Visualization mode radio buttons
+  private JRadioButton arrowModeButton;
+  private JRadioButton flowMapModeButton;
+  private ButtonGroup vizModeGroup;
+  
   private ActionListener resetCanvasListener;
   private ActionListener clearStrokesListener;
   private ActionListener clearBotsListener;
@@ -39,9 +59,19 @@ public class UIPanel extends JPanel {
     void onClearBots();
     void onClearVectorField();
     void onVectorFieldToggle(boolean show);
+    void onStrokesToggle(boolean show);
     void onBrushSizeChanged(float size);
     void onBrushHardnessChanged(float hardness);
     void onBrushStrengthChanged(float strength);
+    void onVisualizationModeChanged(String mode);
+    // Phase 5: Bot controls
+    void onSpawnBot();
+    void onAutoSpawnToggle(boolean enabled);
+    void onBotSpawnRateChanged(int rate);
+    void onBotLifeChanged(float life);
+    void onBotRadarChanged(float radar);
+    void onBotDriftChanged(float drift);
+    void onBotSpeedChanged(float speed);
   }
   
   public UIPanel(UIListener listener) {
@@ -52,12 +82,23 @@ public class UIPanel extends JPanel {
     
     // Vector field toggle
     showVectorFieldCheckBox = new JCheckBox("Show Vector Field");
+    showVectorFieldCheckBox.setSelected(true);  // Enable by default
     showVectorFieldCheckBox.addActionListener(e -> {
       if (uiListener != null) {
         uiListener.onVectorFieldToggle(showVectorFieldCheckBox.isSelected());
       }
     });
     add(showVectorFieldCheckBox);
+    
+    // Strokes toggle
+    showStrokesCheckBox = new JCheckBox("Show Strokes");
+    showStrokesCheckBox.setSelected(true);  // Enable by default
+    showStrokesCheckBox.addActionListener(e -> {
+      if (uiListener != null) {
+        uiListener.onStrokesToggle(showStrokesCheckBox.isSelected());
+      }
+    });
+    add(showStrokesCheckBox);
     
     add(new JSeparator(JSeparator.VERTICAL));
     
@@ -117,7 +158,7 @@ public class UIPanel extends JPanel {
     brushHardnessLabel = new JLabel("Hard: 0.50");
     add(brushHardnessLabel);
     
-    brushHardnessSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, 50);
+    brushHardnessSlider = new JSlider(JSlider.HORIZONTAL, 0, 130, 65);
     brushHardnessSlider.setPreferredSize(new Dimension(80, 40));
     brushHardnessSlider.addChangeListener(e -> {
       float hardness = brushHardnessSlider.getValue() / 100.0f;
@@ -144,6 +185,120 @@ public class UIPanel extends JPanel {
     
     add(new JSeparator(JSeparator.VERTICAL));
     
+    // Visualization mode radio buttons
+    arrowModeButton = new JRadioButton("Arrow Mode");
+    flowMapModeButton = new JRadioButton("Flow Map Mode");
+    vizModeGroup = new ButtonGroup();
+    vizModeGroup.add(arrowModeButton);
+    vizModeGroup.add(flowMapModeButton);
+    arrowModeButton.setSelected(true);
+    add(arrowModeButton);
+    add(flowMapModeButton);
+    arrowModeButton.addActionListener(e -> {
+      if (uiListener != null && arrowModeButton.isSelected()) {
+        uiListener.onVisualizationModeChanged("arrow");
+      }
+    });
+    flowMapModeButton.addActionListener(e -> {
+      if (uiListener != null && flowMapModeButton.isSelected()) {
+        uiListener.onVisualizationModeChanged("flowmap");
+      }
+    });
+    
+    add(new JSeparator(JSeparator.VERTICAL));
+    
+    // Phase 5: Bot controls
+    spawnBotButton = new JButton("Spawn Bot");
+    spawnBotButton.addActionListener(e -> {
+      if (uiListener != null) {
+        uiListener.onSpawnBot();
+      }
+    });
+    add(spawnBotButton);
+    
+    autoSpawnCheckBox = new JCheckBox("Auto Spawn");
+    autoSpawnCheckBox.setSelected(false);
+    autoSpawnCheckBox.addActionListener(e -> {
+      if (uiListener != null) {
+        uiListener.onAutoSpawnToggle(autoSpawnCheckBox.isSelected());
+      }
+    });
+    add(autoSpawnCheckBox);
+    
+    botSpawnRateLabel = new JLabel("Rate: 5");
+    add(botSpawnRateLabel);
+    
+    botSpawnRateSlider = new JSlider(JSlider.HORIZONTAL, 1, 20, 5);
+    botSpawnRateSlider.setPreferredSize(new Dimension(80, 40));
+    botSpawnRateSlider.addChangeListener(e -> {
+      int rate = botSpawnRateSlider.getValue();
+      botSpawnRateLabel.setText(String.format("Rate: %d", rate));
+      if (uiListener != null) {
+        uiListener.onBotSpawnRateChanged(rate);
+      }
+    });
+    add(botSpawnRateSlider);
+    
+    add(new JSeparator(JSeparator.VERTICAL));
+    
+    botLifeLabel = new JLabel("Life: 500");
+    add(botLifeLabel);
+    
+    botLifeSlider = new JSlider(JSlider.HORIZONTAL, 100, 2000, 500);
+    botLifeSlider.setPreferredSize(new Dimension(80, 40));
+    botLifeSlider.addChangeListener(e -> {
+      float life = botLifeSlider.getValue();
+      botLifeLabel.setText(String.format("Life: %.0f", life));
+      if (uiListener != null) {
+        uiListener.onBotLifeChanged(life);
+      }
+    });
+    add(botLifeSlider);
+    
+    botRadarLabel = new JLabel("Radar: 50");
+    add(botRadarLabel);
+    
+    botRadarSlider = new JSlider(JSlider.HORIZONTAL, 10, 200, 50);
+    botRadarSlider.setPreferredSize(new Dimension(80, 40));
+    botRadarSlider.addChangeListener(e -> {
+      float radar = botRadarSlider.getValue();
+      botRadarLabel.setText(String.format("Radar: %.0f", radar));
+      if (uiListener != null) {
+        uiListener.onBotRadarChanged(radar);
+      }
+    });
+    add(botRadarSlider);
+    
+    botDriftLabel = new JLabel("Drift: 0.30");
+    add(botDriftLabel);
+    
+    botDriftSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, 30);
+    botDriftSlider.setPreferredSize(new Dimension(80, 40));
+    botDriftSlider.addChangeListener(e -> {
+      float drift = botDriftSlider.getValue() / 100.0f;
+      botDriftLabel.setText(String.format("Drift: %.2f", drift));
+      if (uiListener != null) {
+        uiListener.onBotDriftChanged(drift);
+      }
+    });
+    add(botDriftSlider);
+    
+    botSpeedLabel = new JLabel("Speed: 2.0");
+    add(botSpeedLabel);
+    
+    botSpeedSlider = new JSlider(JSlider.HORIZONTAL, 1, 50, 20);
+    botSpeedSlider.setPreferredSize(new Dimension(80, 40));
+    botSpeedSlider.addChangeListener(e -> {
+      float speed = botSpeedSlider.getValue() / 10.0f;
+      botSpeedLabel.setText(String.format("Speed: %.1f", speed));
+      if (uiListener != null) {
+        uiListener.onBotSpeedChanged(speed);
+      }
+    });
+    add(botSpeedSlider);
+    
+    add(new JSeparator(JSeparator.VERTICAL));
+    
     // Status label
     statusLabel = new JLabel("Ready");
     statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
@@ -160,5 +315,13 @@ public class UIPanel extends JPanel {
   
   public void setVectorFieldVisible(boolean visible) {
     showVectorFieldCheckBox.setSelected(visible);
+  }
+  
+  public boolean areStrokesVisible() {
+    return showStrokesCheckBox.isSelected();
+  }
+  
+  public void setStrokesVisible(boolean visible) {
+    showStrokesCheckBox.setSelected(visible);
   }
 }

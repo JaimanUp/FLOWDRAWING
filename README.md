@@ -1,4 +1,4 @@
-# Flow‑Guided Generative Drawing Engine
+ # Flow‑Guided Generative Drawing Engine
 
 This repository contains the design and eventually the source code for a generative drawing tool built with **Processing (Java)**. Users manipulate a vector field with brushes; autonomous "bots" then traverse the field and leave trails that form the final artwork.
 

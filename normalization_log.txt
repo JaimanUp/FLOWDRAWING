@@ -1,0 +1,116 @@
+2026-03-26T15:42:43.713902200 - Normalization triggered: percentAtMax=0,311, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:42:45.371557500 - Normalization triggered: percentAtMax=0,311, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:42:46.395309300 - Normalization triggered: percentAtMax=0,312, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:43:03.328946700 - Normalization triggered: percentAtMax=0,324, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:43:07.300743900 - Normalization triggered: percentAtMax=0,335, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:43:09.323357700 - Normalization triggered: percentAtMax=0,338, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:43:11.081313800 - Normalization triggered: percentAtMax=0,340, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:43:18.003575300 - Normalization triggered: percentAtMax=0,345, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:43:23.809472 - Normalization triggered: percentAtMax=0,352, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:43:28.610887700 - Normalization triggered: percentAtMax=0,367, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:48:48.985162800 - Normalization triggered: percentAtMax=0,376, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:48:49.899393700 - Normalization triggered: percentAtMax=0,376, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:48:51.611943700 - Normalization triggered: percentAtMax=0,382, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:48:52.442365 - Normalization triggered: percentAtMax=0,382, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:48:53.726424100 - Normalization triggered: percentAtMax=0,370, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:48:54.281746400 - Normalization triggered: percentAtMax=0,371, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:49:01.453377600 - Normalization triggered: percentAtMax=0,373, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:49:02.801968900 - Normalization triggered: percentAtMax=0,377, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:49:04.228659 - Normalization triggered: percentAtMax=0,384, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:49:42.203714300 - Normalization triggered: percentAtMax=0,387, maxMag=5,000, scaleFactor=1,000
+2026-03-26T15:52:54.658177200 - Normalization: percentAtMax=0,326, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=20196,139, vy=382,735
+  Sum after:  vx=20196,137, vy=382,735
+2026-03-26T15:53:02.186986800 - Normalization: percentAtMax=0,344, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=21430,801, vy=419,589
+  Sum after:  vx=21430,801, vy=419,589
+2026-03-26T15:53:22.540180900 - Normalization: percentAtMax=0,347, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=21609,770, vy=478,092
+  Sum after:  vx=21609,770, vy=478,091
+2026-03-26T15:53:26.253788100 - Normalization: percentAtMax=0,362, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=22610,559, vy=489,555
+  Sum after:  vx=22610,559, vy=489,555
+2026-03-26T15:53:28.063308900 - Normalization: percentAtMax=0,371, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23089,148, vy=501,704
+  Sum after:  vx=23089,146, vy=501,704
+2026-03-26T15:53:29.116448600 - Normalization: percentAtMax=0,377, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23248,908, vy=488,864
+  Sum after:  vx=23248,908, vy=488,864
+2026-03-26T15:53:31.971199 - Normalization: percentAtMax=0,377, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23248,855, vy=480,542
+  Sum after:  vx=23248,855, vy=480,542
+2026-03-26T15:53:33.359715800 - Normalization: percentAtMax=0,377, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23248,918, vy=471,226
+  Sum after:  vx=23248,918, vy=471,226
+2026-03-26T15:53:39.431935500 - Normalization: percentAtMax=0,380, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23350,025, vy=443,081
+  Sum after:  vx=23350,023, vy=443,081
+2026-03-26T15:53:46.405816900 - Normalization: percentAtMax=0,385, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23668,596, vy=447,751
+  Sum after:  vx=23668,596, vy=447,751
+2026-03-26T15:55:41.548435 - Normalization: percentAtMax=0,386, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23679,279, vy=469,606
+  Sum after:  vx=23679,279, vy=469,606
+2026-03-26T15:55:42.108820400 - Normalization: percentAtMax=0,387, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23709,232, vy=484,769
+  Sum after:  vx=23709,232, vy=484,769
+2026-03-26T15:55:42.738231300 - Normalization: percentAtMax=0,388, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23840,313, vy=493,527
+  Sum after:  vx=23840,311, vy=493,527
+2026-03-26T15:55:43.423895500 - Normalization: percentAtMax=0,389, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=23948,047, vy=487,375
+  Sum after:  vx=23948,047, vy=487,375
+2026-03-26T15:55:44.054369 - Normalization: percentAtMax=0,389, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24050,762, vy=520,696
+  Sum after:  vx=24050,754, vy=520,696
+2026-03-26T15:55:44.640270900 - Normalization: percentAtMax=0,392, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24116,602, vy=536,896
+  Sum after:  vx=24116,600, vy=536,896
+2026-03-26T15:55:45.238572500 - Normalization: percentAtMax=0,394, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24164,656, vy=543,805
+  Sum after:  vx=24164,652, vy=543,805
+2026-03-26T15:55:45.874816600 - Normalization: percentAtMax=0,396, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24168,977, vy=634,623
+  Sum after:  vx=24168,977, vy=634,623
+2026-03-26T15:55:46.382041 - Normalization: percentAtMax=0,398, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24182,828, vy=615,124
+  Sum after:  vx=24182,826, vy=615,124
+2026-03-26T15:55:46.848371100 - Normalization: percentAtMax=0,399, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24182,900, vy=609,830
+  Sum after:  vx=24182,895, vy=609,830
+2026-03-26T15:55:47.288097500 - Normalization: percentAtMax=0,397, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24176,045, vy=628,405
+  Sum after:  vx=24176,039, vy=628,405
+2026-03-26T15:55:47.702130400 - Normalization: percentAtMax=0,401, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24224,607, vy=665,575
+  Sum after:  vx=24224,607, vy=665,575
+2026-03-26T15:55:48.096302600 - Normalization: percentAtMax=0,402, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24237,385, vy=674,687
+  Sum after:  vx=24237,385, vy=674,687
+2026-03-26T15:55:48.556195 - Normalization: percentAtMax=0,402, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24239,715, vy=677,813
+  Sum after:  vx=24239,715, vy=677,812
+2026-03-26T15:55:48.973233200 - Normalization: percentAtMax=0,402, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24258,939, vy=671,309
+  Sum after:  vx=24258,939, vy=671,308
+2026-03-26T15:55:49.506109200 - Normalization: percentAtMax=0,402, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24300,787, vy=672,208
+  Sum after:  vx=24300,785, vy=672,208
+2026-03-26T15:55:49.997374400 - Normalization: percentAtMax=0,403, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24356,711, vy=669,544
+  Sum after:  vx=24356,709, vy=669,544
+2026-03-26T15:55:50.426854 - Normalization: percentAtMax=0,403, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24376,559, vy=657,146
+  Sum after:  vx=24376,559, vy=657,146
+2026-03-26T15:55:50.921173800 - Normalization: percentAtMax=0,403, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24412,773, vy=649,839
+  Sum after:  vx=24412,773, vy=649,838
+2026-03-26T15:55:51.328247600 - Normalization: percentAtMax=0,404, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=24444,430, vy=674,374
+  Sum after:  vx=24444,426, vy=674,374
+2026-03-26T16:00:09.913793100 - Normalization: percentAtMax=0,304, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=19544,813, vy=-29,863
+  Sum after:  vx=19544,809, vy=-29,863
+2026-03-26T16:00:14.199879900 - Normalization: percentAtMax=0,320, maxMag=5,000, scaleFactor=1,000
+  Sum before: vx=19826,488, vy=-25,239
+  Sum after:  vx=19826,486, vy=-25,239

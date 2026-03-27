@@ -22,12 +22,12 @@ public class Brush {
   public static final float MIN_SIZE = 5.0f;
   public static final float MAX_SIZE = 100.0f;
   public static final float MIN_STRENGTH = 0.5f;
-  public static final float MAX_STRENGTH = 5.0f;
+  public static final float MAX_STRENGTH = 2.5f;
   
   public Brush() {
     this.size = 30.0f;
     this.hardness = 0.5f;
-    this.strength = 2.0f;
+    this.strength = 1.0f;
     this.spacing = 5.0f;
     this.falloffType = VectorField.FalloffType.GAUSSIAN;
   }

@@ -56,4 +56,23 @@ public class Vector2D {
   public Vector2D copy() {
     return new Vector2D(vx, vy);
   }
+  
+  public void zero() {
+    vx = 0;
+    vy = 0;
+  }
+  
+  public float distance(Vector2D other) {
+    float dx = this.vx - other.vx;
+    float dy = this.vy - other.vy;
+    return (float) Math.sqrt(dx * dx + dy * dy);
+  }
+  
+  /**
+   * Create a random direction vector (normalized, unit length)
+   */
+  public static Vector2D randomDirection() {
+    double angle = Math.random() * 2 * Math.PI;
+    return new Vector2D((float)Math.cos(angle), (float)Math.sin(angle));
+  }
 }

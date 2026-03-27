@@ -1,0 +1,246 @@
+# GUI Interface Plan - FlowDrawing
+
+This document defines the general GUI structure before implementation. It is based on the current project roadmap and the existing codebase, which already includes canvas rendering, vector field controls, sketch controls, and bot simulation controls.
+
+--------------------------------------------------
+
+## 1. General Interface Structure
+
+The application interface will be split into three main areas:
+
+Approved shell decision:
+- Keep the native Windows window bar and standard JFrame decorations.
+- Do not build a custom integrated title bar.
+- Use a standard Swing JMenuBar directly below the native window bar.
+- Place the left vertical tool panel below the JMenuBar.
+- Keep the canvas as the dominant central workspace.
+
+1. Top window frame
+- Native operating system window frame.
+- Includes the standard window controls:
+	- Minimize
+	- Maximize / Restore
+	- Close
+
+2. Top application menu bar
+- A standard horizontal menu integrated into the main screen frame.
+- Main categories:
+	- File
+	- Edit
+	- View
+	- Help
+
+3. Left vertical tool panel
+- A second interface bar located on the left side of the window.
+- This is the main working control area for the drawing system.
+- It will be organized with four tabs at the top of the panel.
+- Only one tab is active at a time.
+- Each tab reveals a different set of controls.
+
+4. Central workspace
+- Main canvas area where background, vector field, sketch strokes, and botfield are rendered.
+- Zoom, pan, painting, and simulation happen here.
+
+--------------------------------------------------
+
+## 2. Top Application Menu Bar
+
+This bar should stay general and uncluttered. It is meant for project-level actions and screen-level options, not detailed tool parameters.
+
+Implementation decision:
+- This will be implemented as a standard JMenuBar attached to the main JFrame.
+- It is visually separate from the native title bar.
+- This avoids custom window-chrome work and keeps normal Windows behavior intact.
+
+### File
+- New Project
+- Open Project
+- Save Project
+- Save Project As
+- Export
+- Exit
+
+### Edit
+- Undo [planned]
+- Redo [planned]
+- Preferences [planned]
+
+### View
+- Reset View
+- Zoom In
+- Zoom Out
+- Fit Canvas to Screen
+- Toggle Left Tool Panel
+
+### Help
+- About
+- Documentation
+- Shortcuts [planned]
+
+Notes:
+- File/Edit/View/Help should remain stable regardless of the active left-side tab.
+- Detailed controls for drawing and simulation should not live here.
+
+--------------------------------------------------
+
+## 3. Left Vertical Tool Panel
+
+This is the main control surface for the creative workflow.
+
+### Tab Structure
+- Background
+- Vector Field
+- Sketch
+- Botfield
+
+Behavior:
+- Tabs appear at the top of the left panel.
+- Clicking a tab switches the visible tool group below it.
+- The panel remains fixed on the left side.
+- Controls should be stacked vertically and grouped clearly.
+
+--------------------------------------------------
+
+## 4. Background Tab
+
+Purpose:
+- Manage the reference or visual background layer behind all simulation and drawing layers.
+
+Controls:
+- Show / Hide
+- Transparency
+- Colour
+- Load Image
+- Clear Image
+
+Implementation notes:
+- Show / Hide controls visibility of the background layer.
+- Transparency adjusts background opacity.
+- Colour sets a solid background color when no image is loaded or when combined with the image.
+- Load Image imports an image file into the background layer.
+- Clear Image removes only the loaded image, not necessarily the background color.
+
+--------------------------------------------------
+
+## 5. Vector Field Tab
+
+Purpose:
+- Control how the vector field is displayed and initialized.
+
+Controls:
+- Show / Hide
+- Transparency
+- Visualization Mode
+	- Arrow
+	- Heatmap
+- Reset
+- Random
+
+Implementation notes:
+- Show / Hide controls the visibility of the field overlay.
+- Transparency changes the opacity of the field rendering.
+- Visualization Mode switches between directional arrows and a color-based field map.
+- Reset clears the field back to zero.
+- Random generates a randomized vector field state for experimentation.
+
+Note:
+- The current code uses Arrow and Flow Map modes. The GUI can label this mode as Arrow / Heatmap if that terminology is preferred, but the implementation should stay consistent.
+
+--------------------------------------------------
+
+## 6. Sketch Tab
+
+Purpose:
+- Control the user drawing layer and brush behavior.
+
+Controls:
+- Show / Hide
+- Transparency
+- Brush / Erase Settings
+- Clear
+
+Implementation notes:
+- Show / Hide controls the sketch layer visibility.
+- Transparency controls opacity of the stroke layer.
+- Brush / Erase Settings opens or reveals controls for:
+	- Brush size
+	- Brush hardness
+	- Brush strength
+	- Erase mode [planned]
+- Clear removes all sketch strokes.
+
+Note:
+- Existing brush sliders already cover part of this tab and should move into this section during GUI refactor.
+
+--------------------------------------------------
+
+## 7. Botfield Tab
+
+Purpose:
+- Control the bot-generated drawing layer and simulation behavior.
+
+Controls:
+- Show / Hide
+- Transparency
+- Bot Settings
+- Simulation Settings
+
+Implementation notes:
+- Show / Hide controls visibility of bot paths and bot markers.
+- Transparency controls bot layer opacity.
+- Bot Settings groups controls such as:
+	- Bot life
+	- Radar
+	- Drift
+	- Speed
+- Simulation Settings groups controls such as:
+	- Spawn Bot
+	- Auto Spawn
+	- Spawn Rate
+	- Start / Stop simulation [planned if needed separately]
+
+Note:
+- Existing bot controls already cover part of this tab and should move into this section during GUI refactor.
+
+--------------------------------------------------
+
+## 8. Layout Behavior Guidelines
+
+- The top menu bar handles general application actions.
+- The left vertical panel handles layer-specific and tool-specific actions.
+- The current horizontal control strip should be retired once its controls are moved into the left tabbed panel.
+- The central canvas must stay visually dominant.
+- The left panel should be compact but scrollable if controls exceed available height.
+- Each tab should use consistent control groupings:
+	- Visibility
+	- Appearance
+	- Layer actions
+	- Advanced settings
+
+--------------------------------------------------
+
+## 9. Recommended First Implementation Order
+
+1. Add a real top menu bar with File, Edit, View, and Help.
+2. Replace the current horizontal control strip with a left-side vertical panel.
+3. Add the four tab sections.
+4. Move existing controls into their correct tabs.
+5. Add missing controls such as transparency and random field generation.
+
+--------------------------------------------------
+
+## 10. Open Design Decisions
+
+- Should the left panel have icons as well as text labels?
+- Should each tab open inline controls or collapsible groups?
+- Should transparency be a slider from 0 to 100 for each layer?
+- Should Botfield simulation run automatically on app start or only after user activation?
+- Should Background colour and image settings coexist or be mutually exclusive?
+
+Closed decisions:
+- The application menu will not be integrated into the native title bar.
+- The window will keep the standard native minimize, maximize, and close controls.
+
+--------------------------------------------------
+
+This file should remain the source of truth for GUI structure decisions before implementation starts.
