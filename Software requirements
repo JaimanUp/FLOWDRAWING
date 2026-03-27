@@ -1,6 +1,12 @@
 Tipo de aplicación
 
-Aplicación de escritorio ejecutada localmente.Inicialmente desarrollada usando la librería Processing, basada en Java.
+Aplicación de escritorio ejecutada localmente.
+
+> **Nota**: el alcance inicial será un prototipo rápido. Se prioriza avanzar sobre el diseño original sin buscar alternativas de lenguaje o arquitectura en esta fase.
+> Java + Processing es la plataforma elegida y los subsistemas de campo, bots y pincel se implementarán según lo propuesto.
+
+Inicialmente desarrollada usando la librería Processing, basada en Java.
+
 
 1. Visión General del Producto
 

@@ -1,0 +1,28 @@
+# Java/Processing ignores
+*.class
+*.jar
+*.exe
+*.log
+*.~
+# Processing sketch cache
+**/bin/**
+**/output/**
+# IDE files
+*.iml
+.idea/
+.vscode/
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle
+.gradle/
+build/
+dist/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# project resources
+/export/
+/tmp/
