@@ -244,3 +244,6 @@ Closed decisions:
 --------------------------------------------------
 
 This file should remain the source of truth for GUI structure decisions before implementation starts.
+
+
+

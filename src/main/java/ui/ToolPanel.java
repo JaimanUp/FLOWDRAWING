@@ -15,6 +15,25 @@ public class ToolPanel extends JPanel {
   private static final int PANEL_WIDTH = 230;
   private static final int SLIDER_WIDTH = 180;
 
+  // ── Color Palette ──────────────────────────────────────────────────────
+  private static final Color COLOR_PANEL_BG = new Color(46, 46, 46);
+  // Main background for panels and tabs. Dark gray base color.
+
+  private static final Color COLOR_SECTION_BG = new Color(55, 55, 55);
+  // Background for individual section panels. Slightly lighter than main panel.
+
+  private static final Color COLOR_SECTION_BORDER = new Color(90, 90, 90);
+  // Border color for section dividers. Medium gray for subtle contrast.
+
+  private static final Color COLOR_TEXT_PRIMARY = new Color(200, 200, 200);
+  // Primary text color for labels, checkboxes, and interactive elements.
+
+  private static final Color COLOR_TEXT_SECONDARY = new Color(180, 180, 180);
+  // Secondary text color for section titles and muted labels.
+
+  private static final Color COLOR_TEXT_TAB = Color.LIGHT_GRAY;
+  // Tab text color. Light gray for tab labels.
+
   // ── Listener interface ────────────────────────────────────────────────
   public interface ToolListener {
     // Background
@@ -60,12 +79,12 @@ public class ToolPanel extends JPanel {
     this.listener = listener;
     setLayout(new BorderLayout());
     setPreferredSize(new Dimension(PANEL_WIDTH, 0));
-    setBackground(new Color(46, 46, 46));
+    setBackground(COLOR_PANEL_BG);
 
     JTabbedPane tabs = new JTabbedPane(JTabbedPane.TOP);
     tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
-    tabs.setBackground(new Color(46, 46, 46));
-    tabs.setForeground(Color.LIGHT_GRAY);
+    tabs.setBackground(COLOR_PANEL_BG);
+    tabs.setForeground(COLOR_TEXT_TAB);
 
     tabs.addTab("BG",     wrapScroll(buildBackgroundTab()));
     tabs.addTab("Field",  wrapScroll(buildVectorFieldTab()));
@@ -96,21 +115,21 @@ public class ToolPanel extends JPanel {
     JPanel panel = new JPanel();
     panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
     panel.setBorder(BorderFactory.createTitledBorder(
-      BorderFactory.createLineBorder(new Color(90, 90, 90)),
+      BorderFactory.createLineBorder(COLOR_SECTION_BORDER),
       title,
       TitledBorder.LEFT,
       TitledBorder.TOP,
       new Font("Arial", Font.BOLD, 11),
-      new Color(180, 180, 180)
+      COLOR_TEXT_SECONDARY
     ));
-    panel.setBackground(new Color(55, 55, 55));
+    panel.setBackground(COLOR_SECTION_BG);
     panel.setAlignmentX(Component.LEFT_ALIGNMENT);
     return panel;
   }
 
   private JLabel rowLabel(String text) {
     JLabel l = new JLabel(text);
-    l.setForeground(new Color(200, 200, 200));
+    l.setForeground(COLOR_TEXT_PRIMARY);
     l.setFont(new Font("Arial", Font.PLAIN, 11));
     l.setAlignmentX(Component.LEFT_ALIGNMENT);
     return l;
@@ -120,7 +139,7 @@ public class ToolPanel extends JPanel {
     JSlider s = new JSlider(min, max, value);
     s.setPreferredSize(new Dimension(SLIDER_WIDTH, 28));
     s.setMaximumSize(new Dimension(SLIDER_WIDTH, 28));
-    s.setBackground(new Color(55, 55, 55));
+    s.setBackground(COLOR_SECTION_BG);
     s.setAlignmentX(Component.LEFT_ALIGNMENT);
     return s;
   }
@@ -134,8 +153,8 @@ public class ToolPanel extends JPanel {
 
   private JCheckBox rowCheckBox(String text, boolean selected) {
     JCheckBox cb = new JCheckBox(text, selected);
-    cb.setBackground(new Color(55, 55, 55));
-    cb.setForeground(new Color(200, 200, 200));
+    cb.setBackground(COLOR_SECTION_BG);
+    cb.setForeground(COLOR_TEXT_PRIMARY);
     cb.setFont(new Font("Arial", Font.PLAIN, 11));
     cb.setAlignmentX(Component.LEFT_ALIGNMENT);
     return cb;
@@ -151,7 +170,7 @@ public class ToolPanel extends JPanel {
   private JPanel buildBackgroundTab() {
     JPanel root = new JPanel();
     root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(new Color(46, 46, 46));
+    root.setBackground(COLOR_PANEL_BG);
     root.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
     // Visibility
@@ -201,7 +220,7 @@ public class ToolPanel extends JPanel {
   private JPanel buildVectorFieldTab() {
     JPanel root = new JPanel();
     root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(new Color(46, 46, 46));
+    root.setBackground(COLOR_PANEL_BG);
     root.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
     // Visibility
@@ -260,7 +279,7 @@ public class ToolPanel extends JPanel {
   private JPanel buildSketchTab() {
     JPanel root = new JPanel();
     root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(new Color(46, 46, 46));
+    root.setBackground(COLOR_PANEL_BG);
     root.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
     // Visibility
@@ -338,7 +357,7 @@ public class ToolPanel extends JPanel {
   private JPanel buildBotfieldTab() {
     JPanel root = new JPanel();
     root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(new Color(46, 46, 46));
+    root.setBackground(COLOR_PANEL_BG);
     root.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
     // Visibility
@@ -442,8 +461,8 @@ public class ToolPanel extends JPanel {
 
   // ── Radio button styling helper ────────────────────────────────────
   private void styleRadio(JRadioButton rb) {
-    rb.setBackground(new Color(55, 55, 55));
-    rb.setForeground(new Color(200, 200, 200));
+    rb.setBackground(COLOR_SECTION_BG);
+    rb.setForeground(COLOR_TEXT_PRIMARY);
     rb.setFont(new Font("Arial", Font.PLAIN, 11));
     rb.setAlignmentX(Component.LEFT_ALIGNMENT);
   }
