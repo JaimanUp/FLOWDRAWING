@@ -141,6 +141,9 @@ public class FlowDrawing extends JFrame {
 
     setExtendedState(JFrame.MAXIMIZED_BOTH);
     setVisible(true);
+    
+    // Fit canvas to screen on startup
+    canvasPanel.resetCanvasToFit();
   }
 
   private void setStatus(String msg) {
@@ -326,22 +329,46 @@ public class FlowDrawing extends JFrame {
     
     /**
      * Reset canvas to best fit current window size.
-     * Calculates zoom level to fit the canvas in the viewport with some margin.
+     * Logic:
+     * 1. Determine reference length: if vertical (height > width), use height; if horizontal, use width
+     * 2. Zoom so one canvas dimension equals reference length
+     * 3. Center canvas both horizontally and vertically on the panel
      */
     public void resetCanvasToFit() {
-      int viewportWidth = getWidth();
-      int viewportHeight = getHeight();
+      int panelWidth = getWidth();
+      int panelHeight = getHeight();
       
-      // Calculate zoom to fit canvas size to viewport
-      // Use the smaller ratio to ensure canvas fits within viewport
-      float zoomX = (float) viewportWidth / CANVAS_WIDTH;
-      float zoomY = (float) viewportHeight / CANVAS_HEIGHT;
-      float fitZoom = Math.min(zoomX, zoomY) * 0.95f;  // 95% to add small margin
+      // Determine reference length based on screen orientation
+      // Vertical: use full height
+      // Horizontal: use width (which already excludes sidebar since we're in BorderLayout.CENTER)
+      float refLength;
+      if (panelHeight >= panelWidth) {
+        // Vertical or square screen: use height as reference
+        refLength = panelHeight;
+      } else {
+        // Horizontal screen: use width as reference
+        refLength = panelWidth;
+      }
       
-      // Reset camera
+      // Calculate zoom so canvas dimension equals reference length
+      float canvasDim = Math.max(CANVAS_WIDTH, CANVAS_HEIGHT);
+      float fitZoom = (refLength / canvasDim) * 0.95f;  // 95% margin
+      
+      // Calculate centers
+      float panelCenterX = panelWidth / 2.0f;
+      float panelCenterY = panelHeight / 2.0f;
+      
+      float canvasCenterX = CANVAS_WIDTH / 2.0f;
+      float canvasCenterY = CANVAS_HEIGHT / 2.0f;
+      
+      // Pan to center the canvas
+      float panX = panelCenterX - (canvasCenterX * fitZoom);
+      float panY = panelCenterY - (canvasCenterY * fitZoom);
+      
+      // Apply camera settings
       cameraController.reset();
-      // Apply fit zoom
       cameraController.setZoom(fitZoom);
+      cameraController.setPan(panX, panY);
       
       // Clear temporary data but preserve vector field
       layerRenderer.resetBackground();

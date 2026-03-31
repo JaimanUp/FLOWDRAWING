@@ -29,6 +29,15 @@ public class CameraController {
     panY -= dy;
   }
   
+  /**
+   * Set pan values directly.
+   * Used for centering operations.
+   */
+  public void setPan(float x, float y) {
+    panX = x;
+    panY = y;
+  }
+  
   public void zoom(float factor) {
     zoomLevel *= factor;
     // Clamp zoom to reasonable bounds
