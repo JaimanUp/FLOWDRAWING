@@ -100,6 +100,38 @@ public class VectorField {
   }
   
   /**
+   * Subtract a force (eraser behavior) with falloff based on distance from center.
+   * Moves vectors toward zero proportionally to the eraser strength.
+   */
+  public void subtractForceWithFalloff(float centerX, float centerY, float radius, 
+                                        float fx, float fy, FalloffType falloff) {
+    int centerGX = (int) (centerX / cellSize);
+    int centerGY = (int) (centerY / cellSize);
+    int radiusInCells = (int) Math.ceil(radius / cellSize);
+    
+    // Normalize force by radius for consistent eraser behavior
+    float normalizedForce = (radius > 0) ? 1.0f / (radius * 0.1f) : 1.0f;
+    float normalizedFx = fx * normalizedForce;
+    
+    for (int gx = centerGX - radiusInCells; gx <= centerGX + radiusInCells; gx++) {
+      for (int gy = centerGY - radiusInCells; gy <= centerGY + radiusInCells; gy++) {
+        if (gx >= 0 && gx < cols && gy >= 0 && gy < rows) {
+          float dx = (gx - centerGX) * cellSize;
+          float dy = (gy - centerGY) * cellSize;
+          float dist = (float) Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < radius) {
+            float factor = calculateFalloff(dist, radius, falloff);
+            // Move vector toward zero by scaling it down
+            float reductionFactor = factor * normalizedFx;
+            vectors[gx][gy].scale(1.0f - reductionFactor);
+          }
+        }
+      }
+    }
+  }
+  
+  /**
    * Calculate falloff based on distance and type.
    */
   private float calculateFalloff(float distance, float radius, FalloffType type) {

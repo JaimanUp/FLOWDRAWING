@@ -69,7 +69,7 @@ nonstop=false
 case "$( uname )" in                #(
   CYGWIN* )         cygwin=true  ;; #(
   Darwin* )         darwin=true  ;; #(
-  MSYS* / MINGW* )  msys=true    ;; #(
+  MSYS* | MINGW* )  msys=true    ;; #(
   NONSTOP* )        nonstop=true ;;
 esac
 

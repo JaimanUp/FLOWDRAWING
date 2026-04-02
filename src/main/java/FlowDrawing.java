@@ -93,6 +93,11 @@ public class FlowDrawing extends JFrame {
         setStatus(show ? "Strokes ON" : "Strokes OFF");
       }
       @Override public void onSketchTransparencyChanged(float a)      { setStatus("[planned] Sketch transparency"); }
+      @Override public void onBrushModeChanged(boolean isBrush) {
+        brush.Brush.BrushMode mode = isBrush ? brush.Brush.BrushMode.BRUSH : brush.Brush.BrushMode.ERASER;
+        canvasPanel.getBrush().setMode(mode);
+        setStatus(isBrush ? "Brush mode" : "Eraser mode");
+      }
       @Override public void onBrushSizeChanged(float size)            { canvasPanel.getBrush().setSize(size); }
       @Override public void onBrushHardnessChanged(float hardness)    { canvasPanel.getBrush().setHardness(hardness); }
       @Override public void onBrushStrengthChanged(float strength)    { canvasPanel.getBrush().setStrength(strength); }
@@ -142,8 +147,9 @@ public class FlowDrawing extends JFrame {
     setExtendedState(JFrame.MAXIMIZED_BOTH);
     setVisible(true);
     
-    // Fit canvas to screen on startup
+    // Fit canvas to screen on startup and request focus
     canvasPanel.resetCanvasToFit();
+    canvasPanel.requestFocusInWindow();
   }
 
   private void setStatus(String msg) {
@@ -177,13 +183,18 @@ public class FlowDrawing extends JFrame {
     private float lastModulatedSize = 0;  // Track previous brush size for interpolation
 
     private String visualizationMode = "arrow";
+    
+    // Keyboard state tracking
+    private volatile boolean zoomModeActive = false;  // True when spacebar is pressed (for zoom/pan)
+    private volatile boolean[] arrowKeysPressed = new boolean[4];  // [up, down, left, right]
 
     public CanvasPanel(int width, int height) {
       this.canvasWidth = width;
       this.canvasHeight = height;
       setPreferredSize(new Dimension(width, height));
-      setBackground(Color.WHITE);
+      setOpaque(false);  // Make transparent so super.paintComponent doesn't paint white background
       setFocusable(true);
+      setFocusTraversalKeysEnabled(false);  // Allow all key events
 
       // Initialize managers
       cameraController = new render.CameraController(width, height);
@@ -197,6 +208,14 @@ public class FlowDrawing extends JFrame {
       
       // Phase 5: Initialize bot engine
       botEngine = new bot.BotEngine(canvasManager.getVectorField());
+
+      // Request focus when component is clicked
+      addMouseListener(new MouseAdapter() {
+        @Override
+        public void mouseClicked(MouseEvent e) {
+          requestFocusInWindow();
+        }
+      });
 
       // Add mouse listeners
       addMouseListener(new MouseAdapter() {
@@ -214,7 +233,7 @@ public class FlowDrawing extends JFrame {
             leftMousePressed = true;
             // Start brush stroke with world coordinates
             java.awt.geom.Point2D.Float worldCoords = cameraController.screenToWorld(
-              e.getX(), e.getY(), canvasWidth, canvasHeight
+              e.getX(), e.getY(), getWidth(), getHeight()
             );
             brushEngine.startStroke(worldCoords.x, worldCoords.y);
             // Reset stroke tracking for polyline
@@ -251,7 +270,7 @@ public class FlowDrawing extends JFrame {
           else if (leftMousePressed) {
             // Convert screen coordinates to world coordinates for brush
             java.awt.geom.Point2D.Float worldCoords = cameraController.screenToWorld(
-              e.getX(), e.getY(), canvasWidth, canvasHeight
+              e.getX(), e.getY(), getWidth(), getHeight()
             );
             brushEngine.paintAt(worldCoords.x, worldCoords.y);
             // Draw visual stroke feedback
@@ -273,9 +292,101 @@ public class FlowDrawing extends JFrame {
       addKeyListener(new KeyAdapter() {
         @Override
         public void keyPressed(KeyEvent e) {
-          if (e.getKeyChar() == 'r' || e.getKeyChar() == 'R') {
+          int keyCode = e.getKeyCode();
+          char keyChar = e.getKeyChar();
+          
+          // Reset view on 'r'
+          if (keyChar == 'r' || keyChar == 'R') {
             cameraController.reset();
             repaint();
+          }
+          
+          // Spacebar activates zoom/pan mode
+          if (keyCode == KeyEvent.VK_SPACE) {
+            zoomModeActive = true;
+            e.consume();  // Consume to prevent other handlers
+          }
+          
+          // Zoom in: spacebar + '+'
+          if (zoomModeActive && (keyChar == '+' || keyChar == '=')) {
+            cameraController.zoomAtMouse(1.2f, getWidth() / 2, getHeight() / 2, getWidth(), getHeight());
+            repaint();
+            e.consume();
+          }
+          
+          // Zoom out: spacebar + '-'
+          if (zoomModeActive && keyChar == '-') {
+            cameraController.zoomAtMouse(0.8f, getWidth() / 2, getHeight() / 2, getWidth(), getHeight());
+            repaint();
+            e.consume();
+          }
+          
+          // Arrow key panning (when spacebar is held)
+          if (zoomModeActive) {
+            int panDistance = 15;  // Pixels to pan per key press
+            switch (keyCode) {
+              case KeyEvent.VK_UP:
+                arrowKeysPressed[0] = true;
+                cameraController.pan(0, panDistance);
+                repaint();
+                e.consume();
+                break;
+              case KeyEvent.VK_DOWN:
+                arrowKeysPressed[1] = true;
+                cameraController.pan(0, -panDistance);
+                repaint();
+                e.consume();
+                break;
+              case KeyEvent.VK_LEFT:
+                arrowKeysPressed[2] = true;
+                cameraController.pan(panDistance, 0);
+                repaint();
+                e.consume();
+                break;
+              case KeyEvent.VK_RIGHT:
+                arrowKeysPressed[3] = true;
+                cameraController.pan(-panDistance, 0);
+                repaint();
+                e.consume();
+                break;
+            }
+          }
+        }
+        
+        @Override
+        public void keyReleased(KeyEvent e) {
+          int keyCode = e.getKeyCode();
+          
+          // Exit zoom/pan mode when spacebar is released
+          if (keyCode == KeyEvent.VK_SPACE) {
+            zoomModeActive = false;
+            arrowKeysPressed[0] = false;
+            arrowKeysPressed[1] = false;
+            arrowKeysPressed[2] = false;
+            arrowKeysPressed[3] = false;
+            e.consume();
+          }
+          
+          // Track arrow key release
+          if (zoomModeActive) {
+            switch (keyCode) {
+              case KeyEvent.VK_UP:
+                arrowKeysPressed[0] = false;
+                e.consume();
+                break;
+              case KeyEvent.VK_DOWN:
+                arrowKeysPressed[1] = false;
+                e.consume();
+                break;
+              case KeyEvent.VK_LEFT:
+                arrowKeysPressed[2] = false;
+                e.consume();
+                break;
+              case KeyEvent.VK_RIGHT:
+                arrowKeysPressed[3] = false;
+                e.consume();
+                break;
+            }
           }
         }
       });
@@ -289,21 +400,12 @@ public class FlowDrawing extends JFrame {
     @Override
     public void run() {
       while (running) {
-        // Handle viewport resizing (skip if component not yet laid out)
+        // Note: Canvas size (1200x800) remains FIXED
+        // Only update viewport dimensions for rendering (window may be resized)
         int currentWidth = getWidth();
         int currentHeight = getHeight();
-        if (currentWidth > 0 && currentHeight > 0 && 
-            (currentWidth != canvasWidth || currentHeight != canvasHeight)) {
-          // Update viewport dimensions
-          canvasWidth = currentWidth;
-          canvasHeight = currentHeight;
-          
-          // Resize only viewport layers, NOT the vector field
-          // Vector field remains fixed at its original size
-          layerRenderer.resizeViewport(canvasWidth, canvasHeight);
-          
-          // Note: Camera controller will use new viewport dimensions in apply()
-          // Vector field and brush engine are NOT recreated - they remain unchanged
+        if (currentWidth > 0 && currentHeight > 0) {
+          layerRenderer.resizeViewport(currentWidth, currentHeight);
         }
         
         // Phase 5: Update bots
@@ -450,19 +552,25 @@ public class FlowDrawing extends JFrame {
     /**
      * Draw all bot paths and bots to the bot layer.
      * Called each frame to update bot visualization.
+     * Traces are accumulated (not cleared each frame) so they persist after bots die.
      */
     private void drawBots() {
       java.awt.Graphics2D g2d = layerRenderer.getBotGraphics();
       
-      // Clear bot layer first
-      g2d.setComposite(java.awt.AlphaComposite.Clear);
-      g2d.fillRect(0, 0, canvasWidth, canvasHeight);
-      g2d.setComposite(java.awt.AlphaComposite.SrcOver);
+      // Do NOT clear the bot layer - accumulate traces for persistence
+      // g2d.setComposite(...);
+      // g2d.fillRect(...);
       
       g2d.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
       
+      // Create a synchronized copy of the bots list to avoid ConcurrentModificationException
+      java.util.ArrayList<bot.Bot> botsCopy;
+      synchronized (botEngine.getBots()) {
+        botsCopy = new java.util.ArrayList<>(botEngine.getBots());
+      }
+      
       // Draw all bot paths
-      for (bot.Bot bot : botEngine.getBots()) {
+      for (bot.Bot bot : botsCopy) {
         java.util.ArrayList<field.Vector2D> path = bot.getPath();
         
         if (path.size() > 1) {
@@ -478,11 +586,17 @@ public class FlowDrawing extends JFrame {
           g2d.setColor(new Color(r, g_val, b, alpha));
           g2d.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
           
-          // Draw polyline through all path points
-          for (int i = 0; i < path.size() - 1; i++) {
-            field.Vector2D p1 = path.get(i);
-            field.Vector2D p2 = path.get(i + 1);
-            g2d.drawLine((int) p1.vx, (int) p1.vy, (int) p2.vx, (int) p2.vy);
+          // Draw polyline through all path points (with local copy for thread safety)
+          synchronized (path) {
+            for (int i = 0; i < path.size() - 1; i++) {
+              field.Vector2D p1 = path.get(i);
+              if (i + 1 < path.size()) {  // Safety check
+                field.Vector2D p2 = path.get(i + 1);
+                if (p1 != null && p2 != null) {
+                  g2d.drawLine((int) p1.vx, (int) p1.vy, (int) p2.vx, (int) p2.vy);
+                }
+              }
+            }
           }
         }
         
@@ -614,16 +728,16 @@ public class FlowDrawing extends JFrame {
       Graphics2D g2d = (Graphics2D) g;
       g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
       
-      // Phase 5: Draw bots before rendering layers
+      // Draw bots into the bot layer (in world coordinates before transform)
       drawBots();
 
       // Save original transform
       java.awt.geom.AffineTransform originalTransform = g2d.getTransform();
 
-      // Apply camera transform
+      // Apply camera transform for zooming and panning
       cameraController.apply(g2d, getWidth(), getHeight());
 
-      // Render layers with camera controller for zoom-aware rendering
+      // Render all layers (including bot layer) with camera transform applied
       layerRenderer.render(g2d, getWidth(), getHeight(), cameraController);
 
       // Reset transform and display FPS

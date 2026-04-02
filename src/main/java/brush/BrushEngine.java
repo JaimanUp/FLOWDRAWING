@@ -38,6 +38,9 @@ public class BrushEngine {
   /**
    * Continue painting with mouse movement.
    * Returns true if brush was applied (respects spacing).
+   * Behavior depends on brush mode:
+   *   BRUSH: add forces to the field
+   *   ERASER: subtract forces (move vectors toward zero)
    */
   public boolean paintAt(float x, float y) {
     if (!isPainting) return false;
@@ -49,21 +52,40 @@ public class BrushEngine {
     
     // Apply if distance exceeds spacing threshold
     if (distance >= brush.getSpacing()) {
-      // Calculate force direction from movement
+      // Calculate force direction from movement (or use strength for eraser)
       float forceX = 0, forceY = 0;
-      if (distance > 0) {
-        forceX = (dx / distance) * brush.getStrength();
-        forceY = (dy / distance) * brush.getStrength();
+      
+      if (brush.getMode() == Brush.BrushMode.BRUSH) {
+        // BRUSH mode: add forces based on mouse delta direction
+        if (distance > 0) {
+          forceX = (dx / distance) * brush.getStrength();
+          forceY = (dy / distance) * brush.getStrength();
+        }
+      } else {
+        // ERASER mode: subtract forces uniformly, moving vectors toward zero
+        forceX = -brush.getStrength();
+        forceY = -brush.getStrength();
       }
       
-      // Apply brush force to field with falloff
-      field.addForceWithFalloff(
-        x, y,
-        brush.getSize(),
-        forceX,
-        forceY,
-        brush.getEffectiveFalloffType()
-      );
+      // Apply force to field with falloff
+      if (brush.getMode() == Brush.BrushMode.BRUSH) {
+        field.addForceWithFalloff(
+          x, y,
+          brush.getSize(),
+          forceX,
+          forceY,
+          brush.getEffectiveFalloffType()
+        );
+      } else {
+        // For eraser, use the same falloff mechanism but with subtraction
+        field.subtractForceWithFalloff(
+          x, y,
+          brush.getSize(),
+          Math.abs(forceX),
+          Math.abs(forceY),
+          brush.getEffectiveFalloffType()
+        );
+      }
       
       // Update last paint position for next spacing check
       lastPaintX = x;

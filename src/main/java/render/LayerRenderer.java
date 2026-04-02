@@ -47,6 +47,9 @@ public class LayerRenderer {
     // Initialize background with default color
     initializeBackground();
     
+    // Explicitly clear bot layer to ensure it's fully transparent
+    clearBots();
+    
     // Initialize Phase 2 field rendering - FIXED SIZE, NEVER CHANGES
     // cellSize = 20.0f gives us 100x100 grid (doubled from 10.0f)
     this.vectorField = new VectorField(canvasWidth, canvasHeight, 20.0f);
@@ -62,17 +65,14 @@ public class LayerRenderer {
   
   /**
    * Resize viewport layers when window is resized.
-   * Vector field size remains FIXED.
-   * Note: All internal layers stay at canvas size.
-   * Only the viewport dimensions are tracked for rendering purposes.
+   * The actual layer BufferedImages remain at FIXED canvas size.
+   * Only viewport dimensions are tracked for rendering purposes.
    */
   public void resizeViewport(int newViewportWidth, int newViewportHeight) {
-    // Just update viewport dimensions for reference
-    // All layers remain at fixed canvas size
+    // Update viewport dimensions only - do NOT resize the actual layers
     viewportWidth = newViewportWidth;
     viewportHeight = newViewportHeight;
-    
-    // No layer resizing needed - all stay at canvas size
+    // Layers stay at their fixed canvas size
   }
   
   /**
@@ -88,7 +88,7 @@ public class LayerRenderer {
     // Store camera for later use
     this.cameraController = camera;
     
-    // Render background layer (viewport-sized)
+    // Render background layer at canvas size (camera transform already applied)
     g2d.drawImage(backgroundLayer, 0, 0, null);
     
     // Render vector field layer (optional, Phase 3)
@@ -104,12 +104,12 @@ public class LayerRenderer {
       g2d.drawImage(vectorFieldLayer, 0, 0, null);
     }
     
-    // Render stroke layer (viewport-sized)
+    // Render stroke layer at canvas size
     if (showStrokes) {
       g2d.drawImage(strokeLayer, 0, 0, null);
     }
     
-    // Render bot layer (viewport-sized)
+    // Render bot layer at canvas size
     g2d.drawImage(botLayer, 0, 0, null);
   }
   
@@ -165,7 +165,7 @@ public class LayerRenderer {
   public void resetBackground() {
     Graphics2D g2d = backgroundLayer.createGraphics();
     g2d.setColor(new Color(245, 245, 245));
-    g2d.fillRect(0, 0, viewportWidth, viewportHeight);
+    g2d.fillRect(0, 0, canvasWidth, canvasHeight);
     g2d.dispose();
   }
   

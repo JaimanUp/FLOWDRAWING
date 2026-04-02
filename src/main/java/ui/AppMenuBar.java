@@ -108,12 +108,12 @@ public class AppMenuBar extends JMenuBar {
     viewMenu.addSeparator();
 
     JMenuItem zoomInItem = new JMenuItem("Zoom In");
-    zoomInItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, KeyEvent.CTRL_DOWN_MASK));
+    zoomInItem.setToolTipText("Zoom in (or use Space + +)");
     zoomInItem.addActionListener(e -> { if (listener != null) listener.onZoomIn(); });
     viewMenu.add(zoomInItem);
 
     JMenuItem zoomOutItem = new JMenuItem("Zoom Out");
-    zoomOutItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, KeyEvent.CTRL_DOWN_MASK));
+    zoomOutItem.setToolTipText("Zoom out (or use Space + -)");
     zoomOutItem.addActionListener(e -> { if (listener != null) listener.onZoomOut(); });
     viewMenu.add(zoomOutItem);
 
@@ -145,13 +145,19 @@ public class AppMenuBar extends JMenuBar {
     shortcutsItem.addActionListener(e -> {
       JOptionPane.showMessageDialog(
         null,
-        "Ctrl+N       New Project\n" +
-        "Ctrl+Q       Exit\n" +
-        "Ctrl+0       Fit Canvas to Screen\n" +
-        "Ctrl++       Zoom In\n" +
-        "Ctrl+-       Zoom Out\n" +
-        "Ctrl+T       Toggle Tool Panel\n" +
-        "R            Reset view (in canvas)",
+        "Ctrl+N          New Project\n" +
+        "Ctrl+Q          Exit\n" +
+        "Ctrl+0          Fit Canvas to Screen\n" +
+        "R               Reset view\n" +
+        "Space + +       Zoom in\n" +
+        "Space + -       Zoom out\n" +
+        "Space + ↑       Pan up\n" +
+        "Space + ↓       Pan down\n" +
+        "Space + ←       Pan left\n" +
+        "Space + →       Pan right\n" +
+        "Ctrl+T          Toggle Tool Panel\n" +
+        "MMB + Drag      Pan (middle mouse)\n" +
+        "Scroll          Zoom at mouse position",
         "Keyboard Shortcuts",
         JOptionPane.PLAIN_MESSAGE
       );

@@ -317,3 +317,59 @@ Realistic Development Timeline
         Total:                      ~2 weeks
 
         for a working tool.
+
+Roadmap Revision — 2026-04-02
+
+        Based on the current implementation status, the next
+        concrete development steps are:
+
+        Short Term (prototype completeness)
+                • Finalize brush + eraser tools
+                        - Add explicit brush / eraser modes in the Sketch panel.
+                        - Implement eraser behavior as vector subtraction toward zero.
+                        - Verify spacing and falloff behavior (Linear / Gaussian / Hard Edge)
+                            match the software requirements.
+
+                • Implement radar-based bot sampling
+                        - Use each bot's radar radius to aggregate multiple field samples
+                            (radial or neighborhood sampling) instead of a single point.
+                        - Apply distance-based dependency curves (Linear / Gaussian /
+                            Hard Edge) when combining samples.
+                        - Keep motion numerically stable and visually smooth.
+
+                • Tie bot life to background
+                        - Sample background luminance under each bot.
+                        - Make life decay faster over light regions and slower over dark
+                            regions, as defined in the requirements.
+
+                • Improve simulation controls
+                        - Add explicit start / pause / reset controls for the Botfield.
+                        - Make it easy to edit the field, then run bots as a separate step.
+
+        Medium Term (feature parity)
+                • Expose field / grid parameters in UI
+                        - Add controls for grid resolution and global magnitude scale in
+                            the Field panel, wiring them into the VectorField.
+                        - Expose field visibility / transparency per layer where useful.
+
+                • Refine visualization & layer controls
+                        - Polish arrow vs flow-map modes and ensure they perform well on
+                            large canvases.
+                        - Add per-layer opacity sliders (background / field / sketch /
+                            bots) for better visual control.
+
+                • Implement basic SVG export
+                        - Convert bot paths (ArrayList<Vector2D>) into SVG polylines.
+                        - Wire this to the existing "Export as SVG" menu entry.
+
+        Later (robust tool)
+                • Add project save / load skeleton
+                        - Introduce a simple JSON-based project format (canvas size,
+                            field data, bot settings, seed, background reference).
+                        - Connect to the disabled Save / Open menu items.
+
+                • Performance and stability pass
+                        - Profile with a larger canvas and ~500 bots.
+                        - Tune thresholds and caps (path point thresholds, max bots,
+                            optional downsampled visualization).
+                        - Add sanity checks for field normalization and bot density.

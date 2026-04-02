@@ -96,6 +96,7 @@ public class ToolPanel extends JPanel {
     // Sketch
     void onSketchToggle(boolean show);
     void onSketchTransparencyChanged(float alpha);
+    void onBrushModeChanged(boolean isBrush);      // true = brush, false = eraser
     void onBrushSizeChanged(float size);
     void onBrushHardnessChanged(float hardness);
     void onBrushStrengthChanged(float strength);
@@ -744,6 +745,36 @@ public class ToolPanel extends JPanel {
     root.add(visSection);
     pad(root);
 
+    // Tool Mode (Brush vs Eraser)
+    JPanel modeSection = section("Tool Mode");
+    JRadioButton brushRadio = new JRadioButton("Brush", true);
+    brushRadio.setForeground(COLOR_ACCENT_GREEN);
+    brushRadio.setBackground(COLOR_PANEL_BG);
+    brushRadio.setToolTipText("Paint mode: adds forces to guide the vector field");
+    brushRadio.getAccessibleContext().setAccessibleName("Brush Mode");
+    brushRadio.getAccessibleContext().setAccessibleDescription("Select brush mode to paint forces");
+    addRadioButtonHoverEffect(brushRadio);
+    
+    JRadioButton eraserRadio = new JRadioButton("Eraser", false);
+    eraserRadio.setForeground(COLOR_ACCENT_GREEN);
+    eraserRadio.setBackground(COLOR_PANEL_BG);
+    eraserRadio.setToolTipText("Erase mode: reduces field vectors toward zero");
+    eraserRadio.getAccessibleContext().setAccessibleName("Eraser Mode");
+    eraserRadio.getAccessibleContext().setAccessibleDescription("Select eraser mode to reduce vector field");
+    addRadioButtonHoverEffect(eraserRadio);
+    
+    ButtonGroup modeGroup = new ButtonGroup();
+    modeGroup.add(brushRadio);
+    modeGroup.add(eraserRadio);
+    
+    brushRadio.addActionListener(e -> { if (listener != null) listener.onBrushModeChanged(true); });
+    eraserRadio.addActionListener(e -> { if (listener != null) listener.onBrushModeChanged(false); });
+    
+    modeSection.add(brushRadio);
+    modeSection.add(eraserRadio);
+    root.add(modeSection);
+    pad(root);
+
     // Appearance
     JPanel appearSection = section("Appearance");
     JLabel alphaLabel = rowLabel("Transparency: 100%");
@@ -765,10 +796,10 @@ public class ToolPanel extends JPanel {
 
     brushSizeLabel = rowLabel("Size: 30");
     brushSection.add(brushSizeLabel);
-    JSlider sizeSlider = rowSlider(5, 100, 30);
-    sizeSlider.setToolTipText("Brush diameter in pixels: 5 (tiny) to 100 (huge). Affects stroke width");
+    JSlider sizeSlider = rowSlider(5, 200, 30);
+    sizeSlider.setToolTipText("Brush diameter in pixels: 5 (tiny) to 200 (huge). Affects stroke width");
     sizeSlider.getAccessibleContext().setAccessibleName("Brush Size");
-    sizeSlider.getAccessibleContext().setAccessibleDescription("Adjust brush size from 5 to 100 pixels");
+    sizeSlider.getAccessibleContext().setAccessibleDescription("Adjust brush size from 5 to 200 pixels");
     sizeSlider.addChangeListener(e -> {
       float v = sizeSlider.getValue();
       brushSizeLabel.setText(String.format("Size: %.0f", v));
