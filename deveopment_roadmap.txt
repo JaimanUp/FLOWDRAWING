@@ -373,3 +373,99 @@ Roadmap Revision — 2026-04-02
                         - Tune thresholds and caps (path point thresholds, max bots,
                             optional downsampled visualization).
                         - Add sanity checks for field normalization and bot density.
+
+
+Roadmap Update — 2026-04-03
+
+        COMPLETED TASKS (April 2-3, 2026):
+
+                ✓ Finalize brush + eraser tools
+                        - Implemented explicit Brush/Eraser mode selection in Sketch tab UI
+                        - Added BrushMode enum (BRUSH, ERASER) with getter/setter
+                        - Implemented eraser behavior via subtractForceWithFalloff() method
+                        - Eraser reduces vector magnitudes proportionally toward zero
+                        - Spacing and falloff behavior (Linear/Gaussian/Hard Edge) working
+                        - Verified spacing and strength parameters apply equally to both modes
+                        - All code compiles and application runs without errors
+                        
+                ✓ Implement keyboard shortcuts for zoom and pan
+                        - Added spacebar-based zoom control (Space + '+' to zoom in, Space + '-' to zoom out)
+                        - Implemented arrow key panning when spacebar is held (Space + arrow keys)
+                        - Added focus management for proper keyboard event handling
+                        - Tested and verified shortcuts work correctly
+                        
+                ✓ Fix bot trace rendering issues
+                        - Fixed bot traces disappearing in specific canvas areas
+                        - Issue was caused by BufferedImage layers not being resized with window
+                        - Implemented proper fixed canvas size (1200x800) with flexible viewport
+                        - Bot traces now accumulate and persist correctly across entire canvas
+                        - Fixed layer clearing mechanism using proper composition modes
+                        
+                ✓ Fix brush cursor alignment with mouse position
+                        - Corrected coordinate transformation to use actual viewport dimensions
+                        - Changed from fixed canvasWidth/canvasHeight to getWidth()/getHeight()
+                        - Brush cursor now properly aligns with mouse position when zoomed/panned
+                        
+                ✓ Increase maximum brush size
+                        - Doubled maximum brush radius from 100 to 200 pixels
+                        - Maintained minimum brush size at 5 pixels
+                        - Updated UI slider and tooltips to reflect new range
+                        - Updated Brush.java MAX_SIZE constant to 200.0f
+
+        ISSUES RESOLVED:
+                • Bot trace disappearing at top-left: Fixed by preventing layer recreation on viewport resize
+                • Brush misalignment: Fixed by using actual component dimensions in coordinate transformation
+                • Grey rectangle overlay: Fixed by making CanvasPanel transparent (setOpaque(false))
+                • Null pointer exceptions in path rendering: Added null safety checks
+                • ConcurrentModificationException in bot rendering: Implemented synchronized list copying
+
+
+        REMAINING TASKS:
+
+        Short Term (next priority)
+                • Implement radar-based bot sampling
+                        - Use each bot's radar radius to aggregate multiple field samples
+                        - Apply distance-based dependency curves
+                        - Status: NOT STARTED
+                        
+                • Tie bot life to background luminance
+                        - Sample background luminance under each bot
+                        - Modulate life decay based on background brightness
+                        - Status: NOT STARTED
+                        
+                • Improve simulation controls
+                        - Add explicit start / pause / reset controls for Botfield
+                        - Status: NOT STARTED
+
+        Medium Term (after short term)
+                • Expose field / grid parameters in UI
+                        - Add grid resolution and magnitude scale controls
+                        - Status: NOT STARTED
+                        
+                • Refine visualization & layer controls
+                        - Polish arrow vs flow-map modes
+                        - Add per-layer opacity sliders
+                        - Status: NOT STARTED
+                        
+                • Implement basic SVG export
+                        - Convert bot paths to SVG polylines
+                        - Status: NOT STARTED
+
+        Later (robust tool)
+                • Add project save / load skeleton
+                        - JSON-based project format
+                        - Status: NOT STARTED
+                        
+                • Performance and stability pass
+                        - Profile with ~500 bots
+                        - Optimize thresholds and caps
+                        - Status: NOT STARTED
+
+        DEVELOPMENT ENVIRONMENT:
+                - Language: Java 25.0.2 (Temurin-25.0.2+10 LTS)
+                - Build: Gradle 9.4.1
+                - Framework: Swing (JFrame, JPanel)
+                - Architecture: Multi-threaded (render thread + simulation thread)
+                - Canvas: Fixed 1200x800, viewport resizable
+                - Layers: Fixed-size BufferedImages (ARGB for transparency)
+                - Vector Field: Grid-based with falloff types (Linear/Gaussian/Hard Edge)
