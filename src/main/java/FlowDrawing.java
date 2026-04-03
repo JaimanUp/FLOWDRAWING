@@ -2,6 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import field.VectorField;
+import brush.Brush;
 
 /**
  * Flow-Guided Generative Drawing Engine
@@ -657,67 +658,78 @@ public class FlowDrawing extends JFrame {
       float dy = worldY - lastStrokeY;
       float distance = (float) Math.sqrt(dx * dx + dy * dy);
       
-      // Modulate brush size based on distance (5% range variation)
-      // Max distance (50 units) gives minimum size (95% of base)
-      // 0 distance gives maximum size (100% of base)
-      float maxDistanceForModulation = 50.0f;
-      float distanceFactor = Math.min(distance / maxDistanceForModulation, 1.0f);
-      float sizeModulator = 1.0f - (distanceFactor * 0.05f);  // Range from 1.0 to 0.95 (5% variation)
-      float currentModulatedSize = baseBrushSize * sizeModulator;
-      
-      // Map brush strength to alpha (transparency)
-      // Strength range: 0.1 to 5.0 -> Alpha range: 1% to 40%
-      float brushStrength = brush.getStrength();
-      float minStrength = 0.1f;
-      float maxStrength = 5.0f;
-      float strengthFactor = (brushStrength - minStrength) / (maxStrength - minStrength);  // Normalize to 0-1
-      strengthFactor = Math.max(0.0f, Math.min(1.0f, strengthFactor));  // Clamp to 0-1
-      
-      int minAlpha = (int) (0.01f * 255);  // 1% opacity
-      int maxAlpha = (int) (0.40f * 255);  // 40% opacity
-      int baseAlpha = (int) (minAlpha + strengthFactor * (maxAlpha - minAlpha));
-      baseAlpha = Math.max(minAlpha, Math.min(maxAlpha, baseAlpha));  // Clamp to 1%-40% range
-      
-      // Apply distance-based transparency modulation: faster = more transparent (5% variation)
-      // Faster movement (larger distance) reduces alpha by up to 5%
-      float transparencyReduction = distanceFactor * 0.05f;  // Up to 5% reduction
-      int alpha = (int) (baseAlpha * (1.0f - transparencyReduction));
-      alpha = Math.max(0, Math.min(255, alpha));  // Ensure stays within bounds
-      
-      // Stroke color with strength-based transparency (light blue)
-      g2d.setColor(new Color(100, 150, 255, alpha));
-      
-      // Draw polyline with varying width by subdividing the segment
-      int numSubdivisions = Math.max(3, (int) distance / 2);  // More subdivisions for longer segments
-      for (int i = 0; i < numSubdivisions; i++) {
-        // Interpolate position along segment
-        float t = (float) (i + 1) / numSubdivisions;
-        float interpX = lastStrokeX + dx * t;
-        float interpY = lastStrokeY + dy * t;
+      // Handle ERASER mode - clear strokes instead of drawing
+      if (brush.getMode() == Brush.BrushMode.ERASER) {
+        // For eraser: clear the stroke layer using Clear composite
+        g2d.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.CLEAR, 0.0f));
         
-        // Interpolate stroke width between last and current size
-        float interpWidth = lastModulatedSize + (currentModulatedSize - lastModulatedSize) * t;
-        interpWidth = Math.max(1.0f, interpWidth);  // Minimum width of 1.0
+        int numSubdivisions = Math.max(3, (int) distance / 2);
+        for (int i = 0; i <= numSubdivisions; i++) {
+          float t = (float) i / numSubdivisions;
+          float interpX = lastStrokeX + dx * t;
+          float interpY = lastStrokeY + dy * t;
+          
+          // Erase circle at this position
+          int radius = (int) baseBrushSize;
+          g2d.fillOval((int)(interpX - radius), (int)(interpY - radius), radius * 2, radius * 2);
+        }
         
-        // Get the previous interpolated position and width
-        float prevT = (float) i / numSubdivisions;
-        float prevX = lastStrokeX + dx * prevT;
-        float prevY = lastStrokeY + dy * prevT;
-        float prevWidth = lastModulatedSize + (currentModulatedSize - lastModulatedSize) * prevT;
-        prevWidth = Math.max(1.0f, prevWidth);
+        g2d.setComposite(java.awt.AlphaComposite.SrcOver);
+      } else {
+        // BRUSH mode - draw strokes
+        // Modulate brush size based on distance (5% range variation)
+        float maxDistanceForModulation = 50.0f;
+        float distanceFactor = Math.min(distance / maxDistanceForModulation, 1.0f);
+        float sizeModulator = 1.0f - (distanceFactor * 0.05f);
+        float currentModulatedSize = baseBrushSize * sizeModulator;
         
-        // Use average width for this segment for smoother transitions
-        float avgWidth = (prevWidth + interpWidth) / 2.0f;
-        g2d.setStroke(new BasicStroke(avgWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        // Map brush strength to alpha (transparency)
+        float brushStrength = brush.getStrength();
+        float minStrength = 0.1f;
+        float maxStrength = 5.0f;
+        float strengthFactor = (brushStrength - minStrength) / (maxStrength - minStrength);
+        strengthFactor = Math.max(0.0f, Math.min(1.0f, strengthFactor));
         
-        // Draw segment
-        g2d.drawLine((int) prevX, (int) prevY, (int) interpX, (int) interpY);
+        int minAlpha = (int) (0.01f * 255);
+        int maxAlpha = (int) (0.40f * 255);
+        int baseAlpha = (int) (minAlpha + strengthFactor * (maxAlpha - minAlpha));
+        baseAlpha = Math.max(minAlpha, Math.min(maxAlpha, baseAlpha));
+        
+        float transparencyReduction = distanceFactor * 0.05f;
+        int alpha = (int) (baseAlpha * (1.0f - transparencyReduction));
+        alpha = Math.max(0, Math.min(255, alpha));
+        
+        // Stroke color with strength-based transparency (light blue)
+        g2d.setColor(new Color(100, 150, 255, alpha));
+        
+        // Draw polyline with varying width by subdividing the segment
+        int numSubdivisions = Math.max(3, (int) distance / 2);
+        for (int i = 0; i < numSubdivisions; i++) {
+          float t = (float) (i + 1) / numSubdivisions;
+          float interpX = lastStrokeX + dx * t;
+          float interpY = lastStrokeY + dy * t;
+          
+          float interpWidth = lastModulatedSize + (currentModulatedSize - lastModulatedSize) * t;
+          interpWidth = Math.max(1.0f, interpWidth);
+          
+          float prevT = (float) i / numSubdivisions;
+          float prevX = lastStrokeX + dx * prevT;
+          float prevY = lastStrokeY + dy * prevT;
+          float prevWidth = lastModulatedSize + (currentModulatedSize - lastModulatedSize) * prevT;
+          prevWidth = Math.max(1.0f, prevWidth);
+          
+          float avgWidth = (prevWidth + interpWidth) / 2.0f;
+          g2d.setStroke(new BasicStroke(avgWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+          
+          g2d.drawLine((int) prevX, (int) prevY, (int) interpX, (int) interpY);
+        }
+        
+        lastModulatedSize = currentModulatedSize;
       }
       
-      // Update last position and size for next segment
+      // Update last position for next segment
       lastStrokeX = worldX;
       lastStrokeY = worldY;
-      lastModulatedSize = currentModulatedSize;
       
       g2d.dispose();
     }

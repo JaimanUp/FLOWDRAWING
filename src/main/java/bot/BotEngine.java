@@ -45,16 +45,76 @@ public class BotEngine {
       Bot bot = bots.get(i);
       
       if (bot.isAlive()) {
-        // Sample field at bot position using bilinear interpolation
-        Vector2D fieldForce = sampleFieldBilinear(bot.getPosition());
+        // Sample field using radar-based multi-point sampling
+        Vector2D fieldForce = sampleFieldWithRadar(bot.getPosition(), bot.getRadar());
         
-        // Update bot with field force
-        bot.update(fieldForce);
+        // Check if there's any field influence in the radar area
+        if (fieldForce.magnitude() == 0) {
+          // No field information in radar area - remove this bot and respawn elsewhere
+          bots.remove(i);
+          
+          // Immediately spawn a replacement bot in a valid location
+          if (autoSpawnEnabled && bots.size() < maxBots) {
+            spawnRandomBot();
+          }
+        } else {
+          // Update bot with aggregated field force
+          bot.update(fieldForce);
+        }
       } else {
         // Remove dead bots
         bots.remove(i);
       }
     }
+  }
+  
+  /**
+   * Sample vector field using radar-based multi-point aggregation.
+   * Takes 16 radial samples around the bot and combines them using distance-based weighting.
+   * @param centerPosition The center position to sample around
+   * @param radarRadius The radius of the sampling area
+   * @return Aggregated vector from all samples
+   */
+  private Vector2D sampleFieldWithRadar(Vector2D centerPosition, float radarRadius) {
+    // Use 16 radial samples around the bot position
+    int numSamples = 16;
+    Vector2D aggregatedForce = new Vector2D(0, 0);
+    float totalWeight = 0;
+    
+    for (int i = 0; i < numSamples; i++) {
+      // Calculate angle for this sample
+      float angle = (float) (2 * Math.PI * i / numSamples);
+      
+      // Calculate sample position within radar radius
+      float sampleDist = radarRadius * 0.7f;  // Sample at 70% of radar radius
+      float sampleX = centerPosition.vx + (float)(Math.cos(angle) * sampleDist);
+      float sampleY = centerPosition.vy + (float)(Math.sin(angle) * sampleDist);
+      
+      // Sample the field at this position
+      Vector2D fieldSample = sampleFieldBilinear(new Vector2D(sampleX, sampleY));
+      
+      // Calculate distance-based weight (Linear falloff: closer = higher weight)
+      float distance = sampleDist;
+      float weight = Math.max(0, 1.0f - (distance / radarRadius));
+      
+      // Accumulate weighted sample
+      fieldSample.scale(weight);
+      aggregatedForce.add(fieldSample);
+      totalWeight += weight;
+    }
+    
+    // Also include center sample with full weight for stability
+    Vector2D centerSample = sampleFieldBilinear(centerPosition);
+    centerSample.scale(1.5f);  // Center sample has more influence
+    aggregatedForce.add(centerSample);
+    totalWeight += 1.5f;
+    
+    // Normalize by total weight
+    if (totalWeight > 0) {
+      aggregatedForce.scale(1.0f / totalWeight);
+    }
+    
+    return aggregatedForce;
   }
   
   /**
@@ -128,9 +188,29 @@ public class BotEngine {
     float canvasWidth = vectorField.getCols() * vectorField.getCellSize();
     float canvasHeight = vectorField.getRows() * vectorField.getCellSize();
     
-    float x = (float) (Math.random() * canvasWidth);
-    float y = (float) (Math.random() * canvasHeight);
+    // Try to find a location with field influence (up to 10 attempts)
+    float x = 0, y = 0;
+    boolean foundGoodLocation = false;
+    for (int attempt = 0; attempt < 10; attempt++) {
+      x = (float) (Math.random() * canvasWidth);
+      y = (float) (Math.random() * canvasHeight);
+      
+      // Check if there's field influence at this location
+      int gridX = Math.round(x / vectorField.getCellSize());
+      int gridY = Math.round(y / vectorField.getCellSize());
+      
+      // Clamp to valid grid bounds
+      gridX = Math.max(0, Math.min(vectorField.getCols() - 1, gridX));
+      gridY = Math.max(0, Math.min(vectorField.getRows() - 1, gridY));
+      
+      Vector2D fieldVector = vectorField.getVector(gridX, gridY);
+      if (fieldVector != null && fieldVector.magnitude() > 0) {
+        foundGoodLocation = true;
+        break;
+      }
+    }
     
+    // If no good location found after 10 attempts, use last attempt location anyway
     Bot bot = new Bot(x, y, botMaxLife, botRadar, botDrift, botSpeed);
     bots.add(bot);
   }
