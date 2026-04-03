@@ -115,8 +115,8 @@ public class FlowDrawing extends JFrame {
       @Override public void onBotDriftChanged(float drift)            { canvasPanel.getBotEngine().setBotDrift(drift); }
       @Override public void onBotSpeedChanged(float speed)            { canvasPanel.getBotEngine().setBotSpeed(speed); }
       @Override public void onSpawnBot() {
-        canvasPanel.getBotEngine().spawnRandomBot();
-        setStatus("Bot spawned");
+        canvasPanel.getBotEngine().spawnMultipleBots();
+        setStatus("Bots spawned (x" + canvasPanel.getBotEngine().getSpawnRate() + ")");
       }
       @Override public void onAutoSpawnToggle(boolean enabled) {
         canvasPanel.getBotEngine().setAutoSpawnEnabled(enabled);
@@ -126,6 +126,18 @@ public class FlowDrawing extends JFrame {
       @Override public void onClearBots() {
         canvasPanel.clearBots();
         setStatus("Bots cleared");
+      }
+      @Override public void onSimulationStart() {
+        canvasPanel.getBotEngine().startSimulation();
+        setStatus("Simulation running");
+      }
+      @Override public void onSimulationPause() {
+        canvasPanel.getBotEngine().pauseSimulation();
+        setStatus("Simulation paused");
+      }
+      @Override public void onSimulationReset() {
+        canvasPanel.getBotEngine().resetSimulation();
+        setStatus("Simulation reset");
       }
     });
 
@@ -201,6 +213,7 @@ public class FlowDrawing extends JFrame {
       cameraController = new render.CameraController(width, height);
       layerRenderer = new render.LayerRenderer(width, height);
       layerRenderer.setShowVectorField(true);  // Show vector field by default
+      layerRenderer.setShowStrokes(false);     // Hide strokes by default
       canvasManager = new CanvasManager(width, height, cameraController, layerRenderer);
       
       // Phase 4: Initialize brush system

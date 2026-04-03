@@ -24,6 +24,9 @@ public class BotEngine {
   private int spawnRate = 5;      // Bots per frame
   private int maxBots = 500;
   
+  // Simulation control
+  private boolean simulationRunning = true;  // Start running by default
+  
   public BotEngine(VectorField vectorField) {
     this.vectorField = vectorField;
     this.bots = new ArrayList<>();
@@ -33,6 +36,11 @@ public class BotEngine {
    * Update all bots: sample field, apply forces, advance simulation
    */
   public void update() {
+    // Skip update if simulation is paused
+    if (!simulationRunning) {
+      return;
+    }
+    
     // Spawn new bots if auto-spawn enabled
     if (autoSpawnEnabled) {
       for (int i = 0; i < spawnRate && bots.size() < maxBots; i++) {
@@ -226,6 +234,15 @@ public class BotEngine {
   }
   
   /**
+   * Spawn multiple bots based on spawn rate
+   */
+  public void spawnMultipleBots() {
+    for (int i = 0; i < spawnRate && bots.size() < maxBots; i++) {
+      spawnRandomBot();
+    }
+  }
+  
+  /**
    * Clear all bots
    */
   public void clearBots() {
@@ -296,5 +313,23 @@ public class BotEngine {
   
   public void setMaxBots(int max) {
     this.maxBots = Math.max(1, max);
+  }
+  
+  // Simulation control
+  public void startSimulation() {
+    this.simulationRunning = true;
+  }
+  
+  public void pauseSimulation() {
+    this.simulationRunning = false;
+  }
+  
+  public void resetSimulation() {
+    this.simulationRunning = true;
+    this.bots.clear();
+  }
+  
+  public boolean isSimulationRunning() {
+    return simulationRunning;
   }
 }

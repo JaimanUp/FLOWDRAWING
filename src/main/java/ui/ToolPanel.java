@@ -112,6 +112,9 @@ public class ToolPanel extends JPanel {
     void onSpawnBot();
     void onAutoSpawnToggle(boolean enabled);
     void onBotSpawnRateChanged(int rate);
+    void onSimulationStart();
+    void onSimulationPause();
+    void onSimulationReset();
     void onClearBots();
   }
 
@@ -736,7 +739,7 @@ public class ToolPanel extends JPanel {
 
     // Visibility
     JPanel visSection = section("Visibility");
-    JCheckBox showStrokes = rowCheckBox("Show Strokes", true);
+    JCheckBox showStrokes = rowCheckBox("Show Strokes", false);
     showStrokes.setToolTipText("Toggle whether your sketch strokes are visible on the canvas");
     showStrokes.getAccessibleContext().setAccessibleName("Show Strokes");
     showStrokes.getAccessibleContext().setAccessibleDescription("Toggle sketch strokes visibility on canvas");
@@ -954,6 +957,52 @@ public class ToolPanel extends JPanel {
 
     // Simulation settings
     JPanel simSection = section("Simulation");
+
+    // Simulation controls (Start/Pause/Reset)
+    JPanel ctrlPanel = new JPanel();
+    ctrlPanel.setLayout(new BoxLayout(ctrlPanel, BoxLayout.X_AXIS));
+    ctrlPanel.setBackground(COLOR_PANEL_BG);
+    ctrlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+    
+    JButton startBtn = rowButton("Start");
+    startBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
+    startBtn.setToolTipText("Start/resume the bot simulation");
+    startBtn.getAccessibleContext().setAccessibleName("Start Simulation");
+    startBtn.getAccessibleContext().setAccessibleDescription("Start or resume the bot field simulation");
+    startBtn.addActionListener(e -> {
+      animateButtonPress(startBtn);
+      if (listener != null) listener.onSimulationStart();
+    });
+    ctrlPanel.add(startBtn);
+    ctrlPanel.add(Box.createHorizontalStrut(4));
+    
+    JButton pauseBtn = rowButton("Pause");
+    pauseBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
+    pauseBtn.setToolTipText("Pause the bot simulation");
+    pauseBtn.getAccessibleContext().setAccessibleName("Pause Simulation");
+    pauseBtn.getAccessibleContext().setAccessibleDescription("Pause the bot field simulation");
+    pauseBtn.addActionListener(e -> {
+      animateButtonPress(pauseBtn);
+      if (listener != null) listener.onSimulationPause();
+    });
+    ctrlPanel.add(pauseBtn);
+    ctrlPanel.add(Box.createHorizontalStrut(4));
+    
+    JButton resetBtn = rowButton("Reset");
+    resetBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
+    resetBtn.setToolTipText("Reset the bot simulation (clears all bots and restarts)");
+    resetBtn.getAccessibleContext().setAccessibleName("Reset Simulation");
+    resetBtn.getAccessibleContext().setAccessibleDescription("Reset the bot field simulation to initial state");
+    resetBtn.addActionListener(e -> {
+      animateButtonPress(resetBtn);
+      if (confirmAction("Reset Simulation", "Clear all bots and reset simulation? This cannot be undone.")) {
+        if (listener != null) listener.onSimulationReset();
+      }
+    });
+    ctrlPanel.add(resetBtn);
+    
+    simSection.add(ctrlPanel);
+    pad(simSection);
 
     botSpawnRateLabel = rowLabel("Spawn Rate: 5");
     simSection.add(botSpawnRateLabel);

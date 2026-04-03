@@ -469,3 +469,60 @@ Roadmap Update — 2026-04-03
                 - Canvas: Fixed 1200x800, viewport resizable
                 - Layers: Fixed-size BufferedImages (ARGB for transparency)
                 - Vector Field: Grid-based with falloff types (Linear/Gaussian/Hard Edge)
+
+========================================
+REVISION LOG
+========================================
+
+## Session: April 3, 2026
+### Timestamp: 2026-04-03 14:30 UTC
+
+COMPLETED CHANGES:
+  ✅ Eraser tool stroke layer clearing
+     - Stroke layer now properly erases with AlphaComposite.CLEAR + fillOval()
+     - Vector field erasing via subtractForceWithFalloff() scaling
+     - Both visual and data layers sync correctly when using eraser
+     
+  ✅ Intelligent bot spawning and lifecycle management
+     - Bots verify entire radar area has field influence before spawning
+     - Runtime field validation: bots respawn if zero field detected in radar
+     - Improved spawnRandomBot() to use 16-point radar sampling
+     - Prevents bots from appearing in empty vector field zones
+     
+  ✅ Simulation controls (Start/Pause/Reset)
+     - Added explicit Start, Pause, Reset buttons in Botfield tab
+     - Simulation can be paused mid-run without losing bot state
+     - Reset clears all bots and restarts simulation
+     - Status bar provides feedback for state changes
+     
+  ✅ Smoothed drift behavior
+     - Replaced erratic frame-by-frame random drift with persistent drift direction
+     - Drift direction changes every 60 frames (smooth curves instead of noise)
+     - Reduced drift force amplitude (removed 2x amplifier)
+     - Bots now follow field more confidently with smooth, sweeping paths
+     
+  ✅ Spawn rate button scaling
+     - Spawn button now spawns multiple bots based on spawn rate slider
+     - Status bar shows: "Bots spawned (x5)" when spawn rate is 5
+     - Allows rapid population control during simulation
+     
+  ✅ Default UI state improvements
+     - Stroke visibility OFF by default (checkbox unchecked, layer hidden)
+     - Reduces visual clutter when starting application
+     - Users can toggle visibility in Sketch tab
+
+PENDING ISSUES:
+  ⚠ None currently critical
+
+TECHNICAL NOTES:
+  - Drift now uses persistent Vector2D direction updated every 60 frames
+  - Bot lifecycle checks fieldForce.magnitude() == 0 to detect empty zones
+  - Spawn button uses spawnMultipleBots() looping spawnRate times
+  - Simulation pause works by skipping update() when simulationRunning == false
+  - Stroke visibility state synced between UI checkbox and LayerRenderer
+
+NEXT PRIORITIES:
+  - Tie bot life to background luminance (background-aware life decay)
+  - Expose field parameters in UI (grid size, normalization, etc.)
+  - Implement basic SVG export for bot paths
+  - Performance profiling with 500+ bots

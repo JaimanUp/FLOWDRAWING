@@ -19,6 +19,10 @@ public class Bot {
   private float drift;      // Random walk influence (0-1)
   private float speed;      // Velocity magnitude
   
+  private Vector2D driftDirection;  // Persistent drift direction that changes slowly
+  private int driftChangeCounter;   // Counter for when to change drift direction
+  private static final int DRIFT_CHANGE_INTERVAL = 60;  // Change direction every 60 frames
+  
   private ArrayList<Vector2D> path;
   private static final float PATH_POINT_THRESHOLD = 2.0f;  // Only add point if distance > threshold
   
@@ -30,6 +34,8 @@ public class Bot {
     this.radar = radar;
     this.drift = Math.max(0, Math.min(1, drift));  // Clamp to [0, 1]
     this.speed = speed;
+    this.driftDirection = Vector2D.randomDirection();  // Initialize random drift direction
+    this.driftChangeCounter = 0;
     this.path = new ArrayList<>();
     this.path.add(new Vector2D(position.vx, position.vy));  // Start path at spawn location
   }
@@ -43,9 +49,16 @@ public class Bot {
       return;
     }
     
-    // Apply drift (random walk influence)
-    Vector2D driftVector = Vector2D.randomDirection();
-    driftVector.scale((float)Math.random() * drift);
+    // Update drift direction slowly (change direction every DRIFT_CHANGE_INTERVAL frames)
+    driftChangeCounter++;
+    if (driftChangeCounter >= DRIFT_CHANGE_INTERVAL) {
+      driftChangeCounter = 0;
+      driftDirection = Vector2D.randomDirection();
+    }
+    
+    // Apply persistent drift direction with controlled influence
+    Vector2D driftVector = driftDirection.copy();
+    driftVector.scale(drift);  // Scale proportional to drift slider
     
     // Combine field force and drift
     Vector2D direction = fieldForce.copy();
