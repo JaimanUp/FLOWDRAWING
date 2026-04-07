@@ -21,6 +21,11 @@ public class FlowDrawing extends JFrame {
   // Fixed canvas dimensions (larger than typical window for painting flexibility)
   private static final int CANVAS_WIDTH = 2000;
   private static final int CANVAS_HEIGHT = 2000;
+  
+  // Trace color oscillation
+  private static final java.awt.Color TRACE_COLOR_1 = new java.awt.Color(0x379439);  // #379439 greenish
+  private static final java.awt.Color TRACE_COLOR_2 = new java.awt.Color(0x6B4D34);  // #6B4D34 brownish
+  private static final long COLOR_OSCILLATION_PERIOD_MS = 2000;  // 2 second cycle
 
   public static void main(String[] args) {
     SwingUtilities.invokeLater(() -> new FlowDrawing());
@@ -60,14 +65,36 @@ public class FlowDrawing extends JFrame {
     }));
 
     // ── Tool panel ─────────────────────────────────────────────────────
+    final FlowDrawing frame = this;  // Store reference for use in anonymous listener class
     toolPanel = new ui.ToolPanel(new ui.ToolPanel.ToolListener() {
 
       // Background
-      @Override public void onBackgroundToggle(boolean show)         { setStatus(show ? "Background ON" : "Background OFF"); }
+      @Override public void onBackgroundToggle(boolean show)         { 
+        canvasPanel.getLayerRenderer().setShowBackground(show);
+        setStatus(show ? "Background ON" : "Background OFF"); 
+      }
       @Override public void onBackgroundTransparencyChanged(float a)  { setStatus("[planned] Background transparency"); }
       @Override public void onBackgroundColorPicker()                 { setStatus("[planned] Background colour picker"); }
-      @Override public void onLoadBackgroundImage()                   { setStatus("[planned] Load background image"); }
-      @Override public void onClearBackgroundImage()                  { setStatus("[planned] Clear background image"); }
+      @Override public void onLoadBackgroundImage() {
+        javax.swing.JFileChooser fc = new javax.swing.JFileChooser();
+        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Image Files", "png", "jpg", "jpeg", "bmp", "gif"));
+        int result = fc.showOpenDialog(frame);
+        if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
+          try {
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(fc.getSelectedFile());
+            canvasPanel.getLayerRenderer().setBackgroundImage(img);
+            canvasPanel.getBotEngine().setBackgroundImage(img);
+            setStatus("Background image loaded: " + fc.getSelectedFile().getName());
+          } catch (Exception ex) {
+            setStatus("Error loading image: " + ex.getMessage());
+          }
+        }
+      }
+      @Override public void onClearBackgroundImage() {
+        canvasPanel.getLayerRenderer().clearBackgroundImage();
+        canvasPanel.getBotEngine().setBackgroundImage(null);
+        setStatus("Background image cleared");
+      }
 
       // Vector Field
       @Override public void onVectorFieldToggle(boolean show) {
@@ -108,12 +135,18 @@ public class FlowDrawing extends JFrame {
       }
 
       // Botfield
-      @Override public void onBotfieldToggle(boolean show)            { setStatus(show ? "Botfield ON" : "Botfield OFF"); }
-      @Override public void onBotfieldTransparencyChanged(float a)    { setStatus("[planned] Botfield transparency"); }
+      @Override public void onBotfieldToggle(boolean show)            { 
+        canvasPanel.getLayerRenderer().setShowBots(show);
+        setStatus(show ? "Botfield ON" : "Botfield OFF"); 
+      }
+      @Override public void onBotfieldTransparencyChanged(float a)    { canvasPanel.setBotTransparency(a); }
       @Override public void onBotLifeChanged(float life)              { canvasPanel.getBotEngine().setBotMaxLife(life); }
       @Override public void onBotRadarChanged(float radar)            { canvasPanel.getBotEngine().setBotRadar(radar); }
-      @Override public void onBotDriftChanged(float drift)            { canvasPanel.getBotEngine().setBotDrift(drift); }
       @Override public void onBotSpeedChanged(float speed)            { canvasPanel.getBotEngine().setBotSpeed(speed); }
+      @Override public void onBotDriftInfluenceChanged(float influence)     { canvasPanel.getBotEngine().setDriftInfluence(influence); }
+      @Override public void onBotFieldInfluenceChanged(float influence)     { canvasPanel.getBotEngine().setFieldInfluence(influence); }
+      @Override public void onBotRepulsionInfluenceChanged(float influence) { canvasPanel.getBotEngine().setRepulsionInfluence(influence); }
+      @Override public void onBotRepulsionRadiusChanged(float radius) { canvasPanel.getBotEngine().setRepulsionRadius(radius); }
       @Override public void onSpawnBot() {
         canvasPanel.getBotEngine().spawnMultipleBots();
         setStatus("Bots spawned (x" + canvasPanel.getBotEngine().getSpawnRate() + ")");
@@ -138,6 +171,14 @@ public class FlowDrawing extends JFrame {
       @Override public void onSimulationReset() {
         canvasPanel.getBotEngine().resetSimulation();
         setStatus("Simulation reset");
+      }
+      @Override public void onBotLuminanceDecayToggle(boolean enabled) {
+        canvasPanel.getBotEngine().setLuminanceDecayEnabled(enabled);
+        setStatus(enabled ? "Luminance-based life decay ON" : "Luminance-based life decay OFF");
+      }
+      @Override public void onBotTraceFadeToggle(boolean enabled) {
+        canvasPanel.setTraceFadeEnabled(enabled);
+        setStatus(enabled ? "Trace fade ON" : "Trace fade OFF");
       }
     });
 
@@ -194,6 +235,9 @@ public class FlowDrawing extends JFrame {
     private float lastStrokeX = Float.NaN;
     private float lastStrokeY = Float.NaN;
     private float lastModulatedSize = 0;  // Track previous brush size for interpolation
+    private boolean traceFadeEnabled = true;  // Toggle for bot trace fade out effect
+    private float botTransparency = 1.0f;  // Bot layer transparency (0.0-1.0)
+    private long frameCount = 0;  // Frame counter for oscillating trace color
 
     private String visualizationMode = "arrow";
     
@@ -414,6 +458,8 @@ public class FlowDrawing extends JFrame {
     @Override
     public void run() {
       while (running) {
+        frameCount++;  // Increment frame counter
+        
         // Note: Canvas size (1200x800) remains FIXED
         // Only update viewport dimensions for rendering (window may be resized)
         int currentWidth = getWidth();
@@ -422,7 +468,17 @@ public class FlowDrawing extends JFrame {
           layerRenderer.resizeViewport(currentWidth, currentHeight);
         }
         
+        // Calculate oscillating color based on frame count (3000 frame cycle)
+        java.awt.Color oscillatingColor = calculateOscillatingColor(frameCount);
+        
         // Phase 5: Update bots
+        // Set trace transparency and color on all bots before update
+        synchronized (botEngine.getBots()) {
+          for (bot.Bot bot : botEngine.getBots()) {
+            bot.setTraceTransparency(botTransparency);
+            bot.setTraceColor(oscillatingColor);
+          }
+        }
         botEngine.update();
         
         repaint();
@@ -521,6 +577,16 @@ public class FlowDrawing extends JFrame {
       repaint();
     }
     
+    public void setTraceFadeEnabled(boolean enabled) {
+      traceFadeEnabled = enabled;
+      repaint();
+    }
+    
+    public void setBotTransparency(float transparency) {
+      botTransparency = Math.max(0.0f, Math.min(1.0f, transparency));
+      repaint();
+    }
+    
     public void setVisualizationMode(String mode) {
       this.visualizationMode = mode;
       layerRenderer.setVisualizationMode(mode);
@@ -539,6 +605,11 @@ public class FlowDrawing extends JFrame {
     // Phase 5: Bot accessor
     public bot.BotEngine getBotEngine() {
       return botEngine;
+    }
+    
+    // Layer renderer accessor for background image management
+    public render.LayerRenderer getLayerRenderer() {
+      return layerRenderer;
     }
     
     // Zoom by a relative factor (used by menu bar actions)
@@ -568,12 +639,62 @@ public class FlowDrawing extends JFrame {
      * Called each frame to update bot visualization.
      * Traces are accumulated (not cleared each frame) so they persist after bots die.
      */
+    /**
+     * Calculate oscillating color based on frame count.
+     * Cycles between color1 and color2 over 3000 frames.
+     * @param frameCount Current frame number
+     * @return The interpolated color for this frame
+     */
+    private java.awt.Color calculateOscillatingColor(long frameCount) {
+      final long OSCILLATION_FRAMES = 3000;
+      float phase = (float) ((frameCount % OSCILLATION_FRAMES) / (double) OSCILLATION_FRAMES);
+      float oscillation = (float) Math.sin(phase * Math.PI * 2);  // -1 to 1
+      float t = (oscillation + 1.0f) * 0.5f;  // Convert to 0-1 range
+      
+      // Interpolate between TRACE_COLOR_1 and TRACE_COLOR_2
+      int r = (int) (TRACE_COLOR_1.getRed() * (1 - t) + TRACE_COLOR_2.getRed() * t);
+      int g = (int) (TRACE_COLOR_1.getGreen() * (1 - t) + TRACE_COLOR_2.getGreen() * t);
+      int b = (int) (TRACE_COLOR_1.getBlue() * (1 - t) + TRACE_COLOR_2.getBlue() * t);
+      
+      return new java.awt.Color(r, g, b);
+    }
+    
+    /**
+     * Interpolate between two colors based on oscillation time.
+     * @param creationTime The timestamp when the trace point was created
+     * @param color1 First color in oscillation
+     * @param color2 Second color in oscillation
+     * @return The interpolated color
+     */
+    private java.awt.Color getOscillatingColor(long creationTime, java.awt.Color color1, java.awt.Color color2) {
+      // Handle cases where creationTime might be 0 or invalid
+      if (creationTime <= 0) {
+        return color1;
+      }
+      
+      long elapsed = System.currentTimeMillis() - creationTime;
+      // Clamp elapsed to prevent negative values from time issues
+      if (elapsed < 0) elapsed = 0;
+      
+      float phase = (float) ((elapsed % COLOR_OSCILLATION_PERIOD_MS) / (double) COLOR_OSCILLATION_PERIOD_MS);
+      float oscillation = (float) Math.sin(phase * Math.PI * 2);  // -1 to 1
+      float t = (oscillation + 1.0f) * 0.5f;  // Convert to 0-1 range
+      
+      // Interpolate between color1 and color2
+      int r = (int) (color1.getRed() * (1 - t) + color2.getRed() * t);
+      int g = (int) (color1.getGreen() * (1 - t) + color2.getGreen() * t);
+      int b = (int) (color1.getBlue() * (1 - t) + color2.getBlue() * t);
+      
+      return new java.awt.Color(r, g, b);
+    }
+    
     private void drawBots() {
       java.awt.Graphics2D g2d = layerRenderer.getBotGraphics();
       
-      // Do NOT clear the bot layer - accumulate traces for persistence
-      // g2d.setComposite(...);
-      // g2d.fillRect(...);
+      // Clear bot layer each frame so traces don't accumulate and transparency works correctly
+      g2d.setComposite(java.awt.AlphaComposite.Clear);
+      g2d.fillRect(0, 0, canvasWidth, canvasHeight);
+      g2d.setComposite(java.awt.AlphaComposite.SrcOver);
       
       g2d.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
       
@@ -583,45 +704,69 @@ public class FlowDrawing extends JFrame {
         botsCopy = new java.util.ArrayList<>(botEngine.getBots());
       }
       
-      // Draw all bot paths
-      for (bot.Bot bot : botsCopy) {
-        java.util.ArrayList<field.Vector2D> path = bot.getPath();
+      // Create a synchronized copy of the dead bots list
+      java.util.ArrayList<bot.Bot> deadBotsCopy;
+      synchronized (botEngine.getDeadBots()) {
+        deadBotsCopy = new java.util.ArrayList<>(botEngine.getDeadBots());
+      }
+      
+      // Combine live and dead bots for trace rendering
+      java.util.ArrayList<bot.Bot> allBots = new java.util.ArrayList<>(botsCopy);
+      allBots.addAll(deadBotsCopy);
+      
+      // Draw all bot paths (from both live and dead bots)
+      for (bot.Bot bot : allBots) {
+        java.util.ArrayList<bot.Bot.TracePoint> path = bot.getPath();
         
         if (path.size() > 1) {
           // Draw path as connected line segments
           float life = bot.getLifeNormalized();  // 0-1, where 1 is just spawned
+          int baseAlpha = (int) (180 + 75 * life);  // Brighten path as bot ages
           
-          // Color based on life: bright when alive, fade to darker
-          int r = (int) (100 + 155 * life);
-          int g_val = (int) (100 + 155 * life);
-          int b = (int) (200 + 55 * life);
-          int alpha = (int) (180 + 75 * life);  // Brighten path as bot ages
-          
-          g2d.setColor(new Color(r, g_val, b, alpha));
           g2d.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
           
           // Draw polyline through all path points (with local copy for thread safety)
           synchronized (path) {
             for (int i = 0; i < path.size() - 1; i++) {
-              field.Vector2D p1 = path.get(i);
+              bot.Bot.TracePoint tp1 = path.get(i);
               if (i + 1 < path.size()) {  // Safety check
-                field.Vector2D p2 = path.get(i + 1);
-                if (p1 != null && p2 != null) {
-                  g2d.drawLine((int) p1.vx, (int) p1.vy, (int) p2.vx, (int) p2.vy);
+                bot.Bot.TracePoint tp2 = path.get(i + 1);
+                if (tp1 != null && tp2 != null) {
+                  // Use the color captured when this trace point was created
+                  java.awt.Color traceColor = tp1.color;
+                  
+                  int alpha = baseAlpha;
+                  
+                  // Apply fade effect: older trace points (lower indices) are more transparent
+                  if (traceFadeEnabled) {
+                    float pathProgress = (float) i / Math.max(1, path.size() - 1);  // 0 (old) to 1 (recent)
+                    float fadeFactor = (float) Math.sin(pathProgress * Math.PI);  // Smooth fade curve
+                    alpha = (int) (baseAlpha * fadeFactor);
+                  }
+                  
+                  // Multiply by captured transparency (from the moment this point was created)
+                  alpha = (int) (alpha * tp1.transparency);
+                  
+                  g2d.setColor(new java.awt.Color(traceColor.getRed(), traceColor.getGreen(), traceColor.getBlue(), alpha));
+                  g2d.drawLine((int) tp1.position.vx, (int) tp1.position.vy, (int) tp2.position.vx, (int) tp2.position.vy);
                 }
               }
             }
           }
         }
-        
+      }
+      
+      // Draw only live bots as circles with direction indicators (not dead ones)
+      for (bot.Bot bot : botsCopy) {
         // Draw bot as small circle at current position
         field.Vector2D pos = bot.getPosition();
         float life = bot.getLifeNormalized();
+        java.awt.Color botColor = bot.getColor();
         int radius = 3;
-        int r = (int) (150 + 105 * life);
-        int g_val = (int) (150 + 105 * life);
-        int b = (int) (255);
-        int alpha = (int) (200 + 55 * life);
+        int r = (int) (botColor.getRed() * (0.7f + 0.3f * life));
+        int g_val = (int) (botColor.getGreen() * (0.7f + 0.3f * life));
+        int b = (int) (botColor.getBlue() * (0.7f + 0.3f * life));
+        int alpha = (int) ((200 + 55 * life) * botTransparency);
         
         g2d.setColor(new Color(r, g_val, b, alpha));
         g2d.fillOval((int) pos.vx - radius, (int) pos.vy - radius, radius * 2, radius * 2);
@@ -630,7 +775,8 @@ public class FlowDrawing extends JFrame {
         field.Vector2D vel = bot.getVelocity();
         float velMag = vel.magnitude();
         if (velMag > 0.1f) {
-          g2d.setColor(new Color(r, g_val, b, 150));
+          int dirAlpha = (int) (150 * botTransparency);
+          g2d.setColor(new Color(r, g_val, b, dirAlpha));
           float dirScale = 5.0f;
           g2d.drawLine(
             (int) pos.vx, (int) pos.vy,

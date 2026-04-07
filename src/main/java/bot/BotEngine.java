@@ -11,13 +11,21 @@ import java.util.ArrayList;
  */
 public class BotEngine {
   private ArrayList<Bot> bots;
+  private ArrayList<Bot> deadBots;  // Keeps traces of dead bots for persistent visualization
   private VectorField vectorField;
   
   // Bot parameters (configurable)
   private float botMaxLife = 500;
   private float botRadar = 50;    // Field sampling radius
-  private float botDrift = 0.3f;  // Random walk influence (0-1)
-  private float botSpeed = 2.0f;  // Velocity magnitude
+  private float botSpeed = 2.0f;  // Maximum velocity magnitude
+  
+  // Repulsion detection range
+  private float repulsionRadius = 50.0f;  // Distance range for repulsion detection
+  
+  // Force influence multipliers (0.0-1.0) - balance between the 3 directional forces
+  private float driftInfluence = 0.3f;        // Random drift force weight (0-1)
+  private float fieldInfluence = 1.0f;        // Vector field force weight (0-1)
+  private float repulsionInfluence = 0.0f;    // Repulsion from traces force weight (0-1)
   
   // Spawn configuration
   private boolean autoSpawnEnabled = false;
@@ -27,9 +35,14 @@ public class BotEngine {
   // Simulation control
   private boolean simulationRunning = true;  // Start running by default
   
+  // Background image luminance decay
+  private java.awt.image.BufferedImage backgroundImage = null;
+  private boolean luminanceDecayEnabled = false;
+  
   public BotEngine(VectorField vectorField) {
     this.vectorField = vectorField;
     this.bots = new ArrayList<>();
+    this.deadBots = new ArrayList<>();
   }
   
   /**
@@ -48,6 +61,27 @@ public class BotEngine {
       }
     }
     
+    // Create combined list of all bots (live and dead) for repulsion calculations
+    java.util.ArrayList<Bot> allBots = new java.util.ArrayList<>();
+    synchronized (bots) {
+      allBots.addAll(bots);
+    }
+    synchronized (deadBots) {
+      allBots.addAll(deadBots);
+    }
+    
+    // Set force parameters on all bots before updating
+    synchronized (bots) {
+      for (Bot bot : bots) {
+        bot.setRepulsionRadius(repulsionRadius);
+        
+        // Set force influence multipliers (the 3 directional forces)
+        bot.setDriftInfluence(driftInfluence);
+        bot.setFieldInfluence(fieldInfluence);
+        bot.setRepulsionInfluence(repulsionInfluence);
+      }
+    }
+    
     // Update existing bots
     for (int i = bots.size() - 1; i >= 0; i--) {
       Bot bot = bots.get(i);
@@ -59,7 +93,7 @@ public class BotEngine {
         // Check if there's any field influence in the radar area
         if (fieldForce.magnitude() == 0) {
           // No field information in radar area - remove this bot and respawn elsewhere
-          bots.remove(i);
+          deadBots.add(bots.remove(i));  // Move to deadBots to preserve trace
           
           // Immediately spawn a replacement bot in a valid location
           if (autoSpawnEnabled && bots.size() < maxBots) {
@@ -67,11 +101,20 @@ public class BotEngine {
           }
         } else {
           // Update bot with aggregated field force
-          bot.update(fieldForce);
+          float lifeDecay;
+          if (luminanceDecayEnabled && backgroundImage != null) {
+            // Luminance-based life decay: bright = slow decay, dark = fast decay
+            float luminance = getLuminanceAtPosition(bot.getPosition());
+            lifeDecay = 1.0f - luminance;
+          } else {
+            // Normal: lose 1 life per frame
+            lifeDecay = 1.0f;
+          }
+          bot.update(fieldForce, allBots, lifeDecay);
         }
       } else {
-        // Remove dead bots
-        bots.remove(i);
+        // Move dead bots to deadBots list to preserve their traces
+        deadBots.add(bots.remove(i));
       }
     }
   }
@@ -219,7 +262,7 @@ public class BotEngine {
     }
     
     // If no good location found after 10 attempts, use last attempt location anyway
-    Bot bot = new Bot(x, y, botMaxLife, botRadar, botDrift, botSpeed);
+    Bot bot = new Bot(x, y, botMaxLife, botRadar, botSpeed);
     bots.add(bot);
   }
   
@@ -228,7 +271,7 @@ public class BotEngine {
    */
   public void spawnBotAt(float x, float y) {
     if (bots.size() < maxBots) {
-      Bot bot = new Bot(x, y, botMaxLife, botRadar, botDrift, botSpeed);
+      Bot bot = new Bot(x, y, botMaxLife, botRadar, botSpeed);
       bots.add(bot);
     }
   }
@@ -243,10 +286,11 @@ public class BotEngine {
   }
   
   /**
-   * Clear all bots
+   * Clear all bots and dead bot traces
    */
   public void clearBots() {
     bots.clear();
+    deadBots.clear();
   }
   
   // Getters
@@ -254,36 +298,16 @@ public class BotEngine {
     return bots;
   }
   
+  public ArrayList<Bot> getDeadBots() {
+    return deadBots;
+  }
+  
   public int getBotCount() {
     return bots.size();
   }
   
-  public float getBotMaxLife() {
-    return botMaxLife;
-  }
-  
-  public float getBotRadar() {
-    return botRadar;
-  }
-  
-  public float getBotDrift() {
-    return botDrift;
-  }
-  
-  public float getBotSpeed() {
-    return botSpeed;
-  }
-  
-  public boolean isAutoSpawnEnabled() {
-    return autoSpawnEnabled;
-  }
-  
   public int getSpawnRate() {
     return spawnRate;
-  }
-  
-  public int getMaxBots() {
-    return maxBots;
   }
   
   // Setters
@@ -295,12 +319,24 @@ public class BotEngine {
     this.botRadar = radar;
   }
   
-  public void setBotDrift(float drift) {
-    this.botDrift = Math.max(0, Math.min(1, drift));
-  }
-  
   public void setBotSpeed(float speed) {
     this.botSpeed = speed;
+  }
+  
+  public void setRepulsionRadius(float radius) {
+    this.repulsionRadius = Math.max(0, radius);
+  }
+  
+  public void setDriftInfluence(float influence) {
+    this.driftInfluence = Math.max(0, Math.min(1, influence));
+  }
+  
+  public void setFieldInfluence(float influence) {
+    this.fieldInfluence = Math.max(0, Math.min(1, influence));
+  }
+  
+  public void setRepulsionInfluence(float influence) {
+    this.repulsionInfluence = Math.max(0, Math.min(1, influence));
   }
   
   public void setAutoSpawnEnabled(boolean enabled) {
@@ -331,5 +367,39 @@ public class BotEngine {
   
   public boolean isSimulationRunning() {
     return simulationRunning;
+  }
+  
+  // Background image and luminance decay
+  public void setBackgroundImage(java.awt.image.BufferedImage img) {
+    this.backgroundImage = img;
+  }
+  
+  public void setLuminanceDecayEnabled(boolean enabled) {
+    this.luminanceDecayEnabled = enabled;
+  }
+  
+  /**
+   * Get luminance (brightness) at a position in the background image.
+   * Returns 0.0 (black) to 1.0 (white).
+   * Returns 1.0 if no background image is loaded.
+   */
+  public float getLuminanceAtPosition(Vector2D position) {
+    if (backgroundImage == null || !luminanceDecayEnabled) {
+      return 1.0f;  // No modulation if no image or feature disabled
+    }
+    
+    // Clamp position to image bounds
+    int x = (int) Math.max(0, Math.min(backgroundImage.getWidth() - 1, position.vx));
+    int y = (int) Math.max(0, Math.min(backgroundImage.getHeight() - 1, position.vy));
+    
+    // Sample pixel and convert to luminance
+    int rgb = backgroundImage.getRGB(x, y);
+    int r = (rgb >> 16) & 0xFF;
+    int g = (rgb >> 8) & 0xFF;
+    int b = rgb & 0xFF;
+    
+    // Standard luminance formula: 0.299*R + 0.587*G + 0.114*B
+    float luminance = (0.299f * r + 0.587f * g + 0.114f * b) / 255.0f;
+    return luminance;
   }
 }

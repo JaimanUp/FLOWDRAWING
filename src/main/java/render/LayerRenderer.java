@@ -21,12 +21,15 @@ public class LayerRenderer {
   private BufferedImage vectorFieldLayer;
   private BufferedImage strokeLayer;
   private BufferedImage botLayer;
+  private BufferedImage backgroundImage;  // User-loaded background image
   
   private int canvasWidth;   // Original canvas/vector field size (fixed)
   private int canvasHeight;  // Original canvas/vector field size (fixed)
   private int viewportWidth;  // Current viewport/window size (may change)
   private int viewportHeight; // Current viewport/window size (may change)
   private boolean showVectorField = false;
+  private boolean showBackground = true;  // Toggle background visibility
+  private boolean showBots = true;  // Toggle bot layer visibility
   private boolean showStrokes = true;  // Show strokes layer by default
   private FieldRenderer fieldRenderer;
   private VectorField vectorField;
@@ -88,8 +91,17 @@ public class LayerRenderer {
     // Store camera for later use
     this.cameraController = camera;
     
-    // Render background layer at canvas size (camera transform already applied)
-    g2d.drawImage(backgroundLayer, 0, 0, null);
+    // Render background (only if showBackground is true)
+    if (showBackground) {
+      if (backgroundImage != null) {
+        g2d.drawImage(backgroundImage, 0, 0, null);
+      } else {
+        g2d.drawImage(backgroundLayer, 0, 0, null);
+      }
+    } else {
+      // Draw default background when visibility is off
+      g2d.drawImage(backgroundLayer, 0, 0, null);
+    }
     
     // Render vector field layer (optional, Phase 3)
     if (showVectorField) {
@@ -109,8 +121,10 @@ public class LayerRenderer {
       g2d.drawImage(strokeLayer, 0, 0, null);
     }
     
-    // Render bot layer at canvas size
-    g2d.drawImage(botLayer, 0, 0, null);
+    // Render bot layer at canvas size (only if showBots is true)
+    if (showBots) {
+      g2d.drawImage(botLayer, 0, 0, null);
+    }
   }
   
   // Backward compatibility: render without camera
@@ -214,5 +228,67 @@ public class LayerRenderer {
     if (fieldRenderer != null) {
       fieldRenderer.setArrowMode("arrow".equals(mode));
     }
+  }
+  
+  // Background image management
+  public void setBackgroundImage(BufferedImage img) {
+    if (img != null) {
+      // Scale image to fit canvas while preserving aspect ratio
+      BufferedImage scaled = new BufferedImage(canvasWidth, canvasHeight, BufferedImage.TYPE_INT_RGB);
+      java.awt.Graphics2D g2d = scaled.createGraphics();
+      
+      // Fill with background color first
+      g2d.setColor(new Color(245, 245, 245));
+      g2d.fillRect(0, 0, canvasWidth, canvasHeight);
+      
+      // Calculate aspect-ratio-preserving dimensions
+      float imgAspect = (float) img.getWidth() / img.getHeight();
+      float canvasAspect = (float) canvasWidth / canvasHeight;
+      int drawWidth, drawHeight, drawX, drawY;
+      
+      if (imgAspect > canvasAspect) {
+        // Image is wider: fit to width
+        drawWidth = canvasWidth;
+        drawHeight = (int) (canvasWidth / imgAspect);
+      } else {
+        // Image is taller: fit to height
+        drawHeight = canvasHeight;
+        drawWidth = (int) (canvasHeight * imgAspect);
+      }
+      
+      // Center the image
+      drawX = (canvasWidth - drawWidth) / 2;
+      drawY = (canvasHeight - drawHeight) / 2;
+      
+      g2d.drawImage(img, drawX, drawY, drawWidth, drawHeight, null);
+      g2d.dispose();
+      this.backgroundImage = scaled;
+    } else {
+      this.backgroundImage = null;
+    }
+  }
+  
+  public BufferedImage getBackgroundImage() {
+    return backgroundImage;
+  }
+  
+  public void clearBackgroundImage() {
+    this.backgroundImage = null;
+  }
+  
+  public void setShowBackground(boolean show) {
+    this.showBackground = show;
+  }
+  
+  public boolean isShowingBackground() {
+    return showBackground;
+  }
+  
+  public void setShowBots(boolean show) {
+    this.showBots = show;
+  }
+  
+  public boolean isShowingBots() {
+    return showBots;
   }
 }

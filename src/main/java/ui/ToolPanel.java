@@ -105,10 +105,14 @@ public class ToolPanel extends JPanel {
     // Botfield
     void onBotfieldToggle(boolean show);
     void onBotfieldTransparencyChanged(float alpha);
+    void onBotTraceFadeToggle(boolean enabled);  // Toggle fade out effect on bot traces
     void onBotLifeChanged(float life);
     void onBotRadarChanged(float radar);
-    void onBotDriftChanged(float drift);
     void onBotSpeedChanged(float speed);
+    void onBotDriftInfluenceChanged(float influence);      // Force balance: drift (0-1)
+    void onBotFieldInfluenceChanged(float influence);      // Force balance: vector field (0-1)
+    void onBotRepulsionInfluenceChanged(float influence);  // Force balance: repulsion (0-1)
+    void onBotRepulsionRadiusChanged(float radius);        // Repulsion detection range
     void onSpawnBot();
     void onAutoSpawnToggle(boolean enabled);
     void onBotSpawnRateChanged(int rate);
@@ -116,11 +120,12 @@ public class ToolPanel extends JPanel {
     void onSimulationPause();
     void onSimulationReset();
     void onClearBots();
+    void onBotLuminanceDecayToggle(boolean enabled);
   }
 
   private final ToolListener listener;
   private JLabel brushSizeLabel, brushHardnessLabel, brushStrengthLabel;
-  private JLabel botLifeLabel, botRadarLabel, botDriftLabel, botSpeedLabel, botSpawnRateLabel;
+  private JLabel botLifeLabel, botRadarLabel, botSpeedLabel, botSpawnRateLabel;
 
   public ToolPanel(ToolListener listener) {
     this.listener = listener;
@@ -899,6 +904,22 @@ public class ToolPanel extends JPanel {
 
     // Bot settings
     JPanel botSection = section("Bot Settings");
+    
+    JCheckBox luminanceDecay = rowCheckBox("Luminance-Based Life Decay", false);
+    luminanceDecay.setToolTipText("Enable background-aware bot life decay: bots live longer in bright areas, die faster in dark areas");
+    luminanceDecay.getAccessibleContext().setAccessibleName("Luminance-Based Life Decay");
+    luminanceDecay.getAccessibleContext().setAccessibleDescription("Toggle whether bot life decays based on background luminance");
+    luminanceDecay.addActionListener(e -> { if (listener != null) listener.onBotLuminanceDecayToggle(luminanceDecay.isSelected()); });
+    botSection.add(luminanceDecay);
+    pad(botSection);
+    
+    JCheckBox traceFade = rowCheckBox("Trace Fade Out", true);
+    traceFade.setToolTipText("Toggle fade out effect on bot traces: older traces become more transparent");
+    traceFade.getAccessibleContext().setAccessibleName("Bot Trace Fade");
+    traceFade.getAccessibleContext().setAccessibleDescription("Enable or disable fade effect on bot traces");
+    traceFade.addActionListener(e -> { if (listener != null) listener.onBotTraceFadeToggle(traceFade.isSelected()); });
+    botSection.add(traceFade);
+    pad(botSection);
 
     botLifeLabel = rowLabel("Life: 500");
     botSection.add(botLifeLabel);
@@ -926,33 +947,81 @@ public class ToolPanel extends JPanel {
     botSection.add(radarSlider);
     pad(botSection);
 
-    botDriftLabel = rowLabel("Drift: 0.30");
-    botSection.add(botDriftLabel);
-    JSlider driftSlider = rowSlider(0, 100, 30);
-    driftSlider.setToolTipText("Random movement variation: 0 (predictable) to 1.0 (chaotic). Affects path randomness");
-    driftSlider.getAccessibleContext().setAccessibleName("Bot Drift");
-    driftSlider.getAccessibleContext().setAccessibleDescription("Adjust bot drift randomness from 0.00 to 1.00");
-    driftSlider.addChangeListener(e -> {
-      float v = driftSlider.getValue() / 100.0f;
-      botDriftLabel.setText(String.format("Drift: %.2f", v));
-      if (listener != null) listener.onBotDriftChanged(v);
-    });
-    botSection.add(driftSlider);
-    pad(botSection);
-
     botSpeedLabel = rowLabel("Speed: 2.0");
     botSection.add(botSpeedLabel);
     JSlider speedSlider = rowSlider(1, 50, 20);
-    speedSlider.setToolTipText("How fast bots move across the canvas (pixels per tick): 0.1 (crawl) to 5.0 (sprint)");
+    speedSlider.setToolTipText("Maximum movement speed (pixels per tick): controls how fast bots travel regardless of force balance");
     speedSlider.getAccessibleContext().setAccessibleName("Bot Speed");
-    speedSlider.getAccessibleContext().setAccessibleDescription("Adjust bot movement speed from 0.1 to 5.0 pixels per tick");
+    speedSlider.getAccessibleContext().setAccessibleDescription("Adjust bot maximum speed from 0.1 to 5.0 pixels per tick");
     speedSlider.addChangeListener(e -> {
       float v = speedSlider.getValue() / 10.0f;
       botSpeedLabel.setText(String.format("Speed: %.1f", v));
       if (listener != null) listener.onBotSpeedChanged(v);
     });
     botSection.add(speedSlider);
+    pad(botSection);
+
     root.add(botSection);
+    pad(root);
+
+    // Force Balance — the 3 directional forces that determine trajectory
+    JPanel forceSection = section("Force Balance");
+    
+    JLabel fieldInfluenceLabel = rowLabel("Field: 1.00");
+    forceSection.add(fieldInfluenceLabel);
+    JSlider fieldInfluenceSlider = rowSlider(0, 100, 100);
+    fieldInfluenceSlider.setToolTipText("Vector field force: how strongly bots follow the flow field. 0 = ignore field, 1.0 = follow field fully");
+    fieldInfluenceSlider.getAccessibleContext().setAccessibleName("Field Force");
+    fieldInfluenceSlider.getAccessibleContext().setAccessibleDescription("Adjust vector field force weight from 0.0 to 1.0");
+    fieldInfluenceSlider.addChangeListener(e -> {
+      float v = fieldInfluenceSlider.getValue() / 100.0f;
+      fieldInfluenceLabel.setText(String.format("Field: %.2f", v));
+      if (listener != null) listener.onBotFieldInfluenceChanged(v);
+    });
+    forceSection.add(fieldInfluenceSlider);
+    pad(forceSection);
+
+    JLabel driftInfluenceLabel = rowLabel("Drift: 0.30");
+    forceSection.add(driftInfluenceLabel);
+    JSlider driftInfluenceSlider = rowSlider(0, 100, 30);
+    driftInfluenceSlider.setToolTipText("Random drift force: adds organic variation to paths. 0 = no randomness, 1.0 = strong random walk");
+    driftInfluenceSlider.getAccessibleContext().setAccessibleName("Drift Force");
+    driftInfluenceSlider.getAccessibleContext().setAccessibleDescription("Adjust drift force weight from 0.0 to 1.0");
+    driftInfluenceSlider.addChangeListener(e -> {
+      float v = driftInfluenceSlider.getValue() / 100.0f;
+      driftInfluenceLabel.setText(String.format("Drift: %.2f", v));
+      if (listener != null) listener.onBotDriftInfluenceChanged(v);
+    });
+    forceSection.add(driftInfluenceSlider);
+    pad(forceSection);
+    
+    JLabel repulsionInfluenceLabel = rowLabel("Repulsion: 0.00");
+    forceSection.add(repulsionInfluenceLabel);
+    JSlider repulsionInfluenceSlider = rowSlider(0, 100, 0);
+    repulsionInfluenceSlider.setToolTipText("Repulsion force: pushes bots away from existing traces. 0 = ignore traces, 1.0 = strong avoidance");
+    repulsionInfluenceSlider.getAccessibleContext().setAccessibleName("Repulsion Force");
+    repulsionInfluenceSlider.getAccessibleContext().setAccessibleDescription("Adjust repulsion force weight from 0.0 to 1.0");
+    repulsionInfluenceSlider.addChangeListener(e -> {
+      float v = repulsionInfluenceSlider.getValue() / 100.0f;
+      repulsionInfluenceLabel.setText(String.format("Repulsion: %.2f", v));
+      if (listener != null) listener.onBotRepulsionInfluenceChanged(v);
+    });
+    forceSection.add(repulsionInfluenceSlider);
+    pad(forceSection);
+
+    JLabel repulsionRadiusLabel = rowLabel("Repulsion Radius: 50");
+    forceSection.add(repulsionRadiusLabel);
+    JSlider repulsionRadiusSlider = rowSlider(10, 200, 50);
+    repulsionRadiusSlider.setToolTipText("Detection range for repulsion: how far away traces are sensed. Only relevant when Repulsion > 0");
+    repulsionRadiusSlider.getAccessibleContext().setAccessibleName("Repulsion Radius");
+    repulsionRadiusSlider.getAccessibleContext().setAccessibleDescription("Adjust repulsion detection radius from 10 to 200 pixels");
+    repulsionRadiusSlider.addChangeListener(e -> {
+      int v = repulsionRadiusSlider.getValue();
+      repulsionRadiusLabel.setText(String.format("Repulsion Radius: %d", v));
+      if (listener != null) listener.onBotRepulsionRadiusChanged(v);
+    });
+    forceSection.add(repulsionRadiusSlider);
+    root.add(forceSection);
     pad(root);
 
     // Simulation settings
