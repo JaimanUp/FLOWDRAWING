@@ -18,27 +18,6 @@ import java.awt.geom.RoundRectangle2D;
  * Replaces the old horizontal UIPanel strip.
  */
 
-/**
- * Custom ButtonUI that prevents the default L&F from overriding colors when pressed/armed
- */
-class CustomButtonUI extends BasicButtonUI {
-  @Override
-  public void paint(Graphics g, JComponent c) {
-    // Don't let the L&F apply armed/pressed state colors
-    // Just render with the button's currently set background color
-    JButton b = (JButton) c;
-    
-    // Paint background
-    if (b.isOpaque()) {
-      g.setColor(b.getBackground());
-      g.fillRect(0, 0, b.getWidth(), b.getHeight());
-    }
-    
-    // Paint the button's content (text, icon, etc.)
-    super.paint(g, c);
-  }
-}
-
 public class ToolPanel extends JPanel {
 
   private static final int PANEL_WIDTH = 230;
@@ -78,54 +57,65 @@ public class ToolPanel extends JPanel {
   // Secondary accent color. Cyan for hover states, secondary highlights, and alternative selections.
 
   // ── Listener interface ────────────────────────────────────────────────
+  // All methods have default no-op implementations so implementors only
+  // override the callbacks they care about, and new callbacks never break
+  // existing code.
   public interface ToolListener {
     // Background
-    void onBackgroundToggle(boolean show);
-    void onBackgroundTransparencyChanged(float alpha);
-    void onBackgroundColorPicker();
-    void onLoadBackgroundImage();
-    void onClearBackgroundImage();
+    default void onBackgroundToggle(boolean show) {}
+    default void onBackgroundTransparencyChanged(float alpha) {}
+    default void onBackgroundColorPicker() {}
+    default void onLoadBackgroundImage() {}
+    default void onClearBackgroundImage() {}
 
     // Vector Field
-    void onVectorFieldToggle(boolean show);
-    void onVectorFieldTransparencyChanged(float alpha);
-    void onVisualizationModeChanged(String mode);   // "arrow" | "heatmap"
-    void onResetVectorField();
-    void onRandomVectorField();
+    default void onVectorFieldToggle(boolean show) {}
+    default void onVectorFieldTransparencyChanged(float alpha) {}
+    default void onVisualizationModeChanged(String mode) {}   // "arrow" | "heatmap"
+    default void onResetVectorField() {}
+    default void onRandomVectorField() {}
 
     // Sketch
-    void onSketchToggle(boolean show);
-    void onSketchTransparencyChanged(float alpha);
-    void onBrushModeChanged(boolean isBrush);      // true = brush, false = eraser
-    void onBrushSizeChanged(float size);
-    void onBrushHardnessChanged(float hardness);
-    void onBrushStrengthChanged(float strength);
-    void onClearSketch();
+    default void onSketchToggle(boolean show) {}
+    default void onSketchTransparencyChanged(float alpha) {}
+    default void onBrushModeChanged(boolean isBrush) {}      // true = brush, false = eraser
+    default void onBrushSizeChanged(float size) {}
+    default void onBrushHardnessChanged(float hardness) {}
+    default void onBrushStrengthChanged(float strength) {}
+    default void onClearSketch() {}
 
     // Botfield
-    void onBotfieldToggle(boolean show);
-    void onBotfieldTransparencyChanged(float alpha);
-    void onBotTraceFadeToggle(boolean enabled);  // Toggle fade out effect on bot traces
-    void onBotLifeChanged(float life);
-    void onBotRadarChanged(float radar);
-    void onBotSpeedChanged(float speed);
-    void onBotDriftInfluenceChanged(float influence);      // Force balance: drift (0-1)
-    void onBotFieldInfluenceChanged(float influence);      // Force balance: vector field (0-1)
-    void onBotRepulsionInfluenceChanged(float influence);  // Force balance: repulsion (0-1)
-    void onBotRepulsionRadiusChanged(float radius);        // Repulsion detection range
-    void onSpawnBot();
-    void onAutoSpawnToggle(boolean enabled);
-    void onBotSpawnRateChanged(int rate);
-    void onSimulationStart();
-    void onSimulationPause();
-    void onSimulationReset();
-    void onClearBots();
-    void onBotLuminanceDecayToggle(boolean enabled);
+    default void onBotfieldToggle(boolean show) {}
+    default void onBotfieldTransparencyChanged(float alpha) {}
+    default void onBotTraceFadeToggle(boolean enabled) {}
+    default void onBotLifeChanged(float life) {}
+    default void onBotRadarChanged(float radar) {}
+    default void onBotSpeedChanged(float speed) {}
+    default void onBotDriftInfluenceChanged(float influence) {}
+    default void onBotFieldInfluenceChanged(float influence) {}
+    default void onBotRepulsionInfluenceChanged(float influence) {}
+    default void onBotRepulsionRadiusChanged(float radius) {}
+    default void onSpawnBot() {}
+    default void onAutoSpawnToggle(boolean enabled) {}
+    default void onBotNumberChanged(int number) {}
+    default void onSimulationToggle() {}
+    default void onSimulationReset() {}
+    default void onClearBots() {}
+    default void onClearTraces() {}
+    default void onBotLuminanceDecayToggle(boolean enabled) {}
+
+    // Radar sampling
+    default void onRadarSamplingFalloffChanged(String falloffType) {}
+    default void onRadarSamplesChanged(int numSamples) {}
+    default void onRadarSampleDistanceChanged(float distance) {}
+    default void onCenterSampleWeightChanged(float weight) {}
   }
 
   private final ToolListener listener;
   private JLabel brushSizeLabel, brushHardnessLabel, brushStrengthLabel;
-  private JLabel botLifeLabel, botRadarLabel, botSpeedLabel, botSpawnRateLabel;
+  private JLabel botLifeLabel, botRadarLabel, botSpeedLabel, botNumberLabel;
+  private JLabel botCountLabel;  // Live bot counter in UI
+  private JButton simToggleBtn;  // Play/Pause toggle button
 
   public ToolPanel(ToolListener listener) {
     this.listener = listener;
@@ -149,7 +139,6 @@ public class ToolPanel extends JPanel {
     // Ensure tabs fill available space
     tabs.setMinimumSize(new Dimension(PANEL_MIN_WIDTH, 0));
     tabs.setPreferredSize(new Dimension(PANEL_WIDTH, 0));
-    tabs.setMaximumSize(new Dimension(Short.MAX_VALUE, 70));  // Cap height but allow width expansion
     
     // Apply custom rounded tab UI (do NOT call updateUI() after setUI())
     tabs.setUI(new RoundedTabbedPaneUI());
@@ -169,6 +158,39 @@ public class ToolPanel extends JPanel {
     
     // Register keyboard shortcuts for tab navigation (Ctrl+1-4)
     registerKeyboardShortcuts(tabs);
+  }
+  
+  /**
+   * Update the Play/Pause toggle button text and tooltip based on simulation state.
+   * Call from the render loop or after toggling.
+   * @param running true if simulation is currently running
+   */
+  public void updateSimulationState(boolean running) {
+    if (simToggleBtn != null) {
+      SwingUtilities.invokeLater(() -> {
+        if (running) {
+          simToggleBtn.setText("\u23F8 Pause");
+          simToggleBtn.setToolTipText("Pause the bot simulation");
+        } else {
+          simToggleBtn.setText("\u25B6 Play");
+          simToggleBtn.setToolTipText("Start the bot simulation");
+        }
+      });
+    }
+  }
+  
+  /**
+   * Update the live bot counter label with current active and dead bot counts.
+   * Call from the render loop for real-time feedback.
+   * @param active Number of currently alive bots
+   * @param dead Number of dead bots with preserved traces
+   */
+  public void updateBotCount(int active, int dead) {
+    if (botCountLabel != null) {
+      SwingUtilities.invokeLater(() -> {
+        botCountLabel.setText(String.format("Active: %d  |  Traces: %d", active, dead));
+      });
+    }
   }
 
   // ── Scroll wrapper ────────────────────────────────────────────────────
@@ -631,10 +653,8 @@ public class ToolPanel extends JPanel {
     clearImgBtn.getAccessibleContext().setAccessibleDescription("Removes the currently loaded background image");
     clearImgBtn.addActionListener(e -> {
       animateButtonPress(clearImgBtn);
-      if (confirmAction("Clear Background Image", "Are you sure? This will remove the current background image.")) {
-        if (listener != null) {
-          listener.onClearBackgroundImage();
-        }
+      if (listener != null) {
+        listener.onClearBackgroundImage();
       }
     });
     imgSection.add(loadBtn);
@@ -756,20 +776,16 @@ public class ToolPanel extends JPanel {
     // Tool Mode (Brush vs Eraser)
     JPanel modeSection = section("Tool Mode");
     JRadioButton brushRadio = new JRadioButton("Brush", true);
-    brushRadio.setForeground(COLOR_ACCENT_GREEN);
-    brushRadio.setBackground(COLOR_PANEL_BG);
+    styleRadio(brushRadio);
     brushRadio.setToolTipText("Paint mode: adds forces to guide the vector field");
     brushRadio.getAccessibleContext().setAccessibleName("Brush Mode");
     brushRadio.getAccessibleContext().setAccessibleDescription("Select brush mode to paint forces");
-    addRadioButtonHoverEffect(brushRadio);
     
     JRadioButton eraserRadio = new JRadioButton("Eraser", false);
-    eraserRadio.setForeground(COLOR_ACCENT_GREEN);
-    eraserRadio.setBackground(COLOR_PANEL_BG);
+    styleRadio(eraserRadio);
     eraserRadio.setToolTipText("Erase mode: reduces field vectors toward zero");
     eraserRadio.getAccessibleContext().setAccessibleName("Eraser Mode");
     eraserRadio.getAccessibleContext().setAccessibleDescription("Select eraser mode to reduce vector field");
-    addRadioButtonHoverEffect(eraserRadio);
     
     ButtonGroup modeGroup = new ButtonGroup();
     modeGroup.add(brushRadio);
@@ -853,10 +869,8 @@ public class ToolPanel extends JPanel {
     clearBtn.getAccessibleContext().setAccessibleDescription("Removes all sketch strokes from the canvas");
     clearBtn.addActionListener(e -> {
       animateButtonPress(clearBtn);
-      if (confirmAction("Clear Sketch Strokes", "Are you sure? All sketch strokes will be removed. This cannot be undone.")) {
-        if (listener != null) {
-          listener.onClearSketch();
-        }
+      if (listener != null) {
+        listener.onClearSketch();
       }
     });
     actSection.add(clearBtn);
@@ -1024,6 +1038,102 @@ public class ToolPanel extends JPanel {
     root.add(forceSection);
     pad(root);
 
+    // Radar Sampling — multi-point field aggregation with distance curves
+    JPanel radarSection = section("Radar Sampling");
+    
+    JLabel falloffLabel = rowLabel("Falloff Type: Gaussian");
+    radarSection.add(falloffLabel);
+    
+    JPanel falloffPanel = new JPanel();
+    falloffPanel.setLayout(new BoxLayout(falloffPanel, BoxLayout.Y_AXIS));
+    falloffPanel.setBackground(COLOR_PANEL_BG);
+    falloffPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+    
+    ButtonGroup falloffGroup = new ButtonGroup();
+    
+    JRadioButton linearRadio = new JRadioButton("Linear");
+    styleRadio(linearRadio);
+    linearRadio.setToolTipText("Linear falloff: samples closer to center have more weight");
+    linearRadio.addActionListener(e -> {
+      if (linearRadio.isSelected()) {
+        falloffLabel.setText("Falloff Type: Linear");
+        if (listener != null) listener.onRadarSamplingFalloffChanged("Linear");
+      }
+    });
+    falloffGroup.add(linearRadio);
+    falloffPanel.add(linearRadio);
+    
+    JRadioButton gaussianRadio = new JRadioButton("Gaussian");
+    styleRadio(gaussianRadio);
+    gaussianRadio.setToolTipText("Gaussian falloff (default): smoother curve emphasizing center samples");
+    gaussianRadio.setSelected(true);
+    gaussianRadio.addActionListener(e -> {
+      if (gaussianRadio.isSelected()) {
+        falloffLabel.setText("Falloff Type: Gaussian");
+        if (listener != null) listener.onRadarSamplingFalloffChanged("Gaussian");
+      }
+    });
+    falloffGroup.add(gaussianRadio);
+    falloffPanel.add(gaussianRadio);
+    
+    JRadioButton hardEdgeRadio = new JRadioButton("Hard Edge");
+    styleRadio(hardEdgeRadio);
+    hardEdgeRadio.setToolTipText("Hard edge falloff: constant weighting (flat aggregation)");
+    hardEdgeRadio.addActionListener(e -> {
+      if (hardEdgeRadio.isSelected()) {
+        falloffLabel.setText("Falloff Type: Hard Edge");
+        if (listener != null) listener.onRadarSamplingFalloffChanged("Hard Edge");
+      }
+    });
+    falloffGroup.add(hardEdgeRadio);
+    falloffPanel.add(hardEdgeRadio);
+    
+    radarSection.add(falloffPanel);
+    pad(radarSection);
+    
+    JLabel samplesLabel = rowLabel("Samples: 16");
+    radarSection.add(samplesLabel);
+    JSlider samplesSlider = rowSlider(4, 32, 16);
+    samplesSlider.setToolTipText("Number of radial sampling points around each bot: more = smoother motion but more computation");
+    samplesSlider.getAccessibleContext().setAccessibleName("Radar Samples");
+    samplesSlider.getAccessibleContext().setAccessibleDescription("Adjust number of radar samples from 4 to 32");
+    samplesSlider.addChangeListener(e -> {
+      int samples = samplesSlider.getValue();
+      samplesLabel.setText(String.format("Samples: %d", samples));
+      if (listener != null) listener.onRadarSamplesChanged(samples);
+    });
+    radarSection.add(samplesSlider);
+    pad(radarSection);
+    
+    JLabel sampleDistLabel = rowLabel("Sample Distance: 0.70");
+    radarSection.add(sampleDistLabel);
+    JSlider sampleDistSlider = rowSlider(25, 100, 70);  // Stored as 0-100% in slider
+    sampleDistSlider.setToolTipText("Distance for radial samples: fraction of radar radius (where samples are taken): 0.25 = 25% of radius, 1.0 = at edge");
+    sampleDistSlider.getAccessibleContext().setAccessibleName("Sample Distance");
+    sampleDistSlider.getAccessibleContext().setAccessibleDescription("Adjust sample distance from 0.25 to 1.0 of radar radius");
+    sampleDistSlider.addChangeListener(e -> {
+      float distance = sampleDistSlider.getValue() / 100.0f;
+      sampleDistLabel.setText(String.format("Sample Distance: %.2f", distance));
+      if (listener != null) listener.onRadarSampleDistanceChanged(distance);
+    });
+    radarSection.add(sampleDistSlider);
+    pad(radarSection);
+    
+    JLabel centerWeightLabel = rowLabel("Center Weight: 1.50");
+    radarSection.add(centerWeightLabel);
+    JSlider centerWeightSlider = rowSlider(10, 300, 150);  // Stored as 0-300 (1x-3x weight)
+    centerWeightSlider.setToolTipText("Extra weight for center sample to emphasize local field influence: higher = more focus on center");
+    centerWeightSlider.getAccessibleContext().setAccessibleName("Center Sample Weight");
+    centerWeightSlider.getAccessibleContext().setAccessibleDescription("Adjust center sample weight from 0.1 to 3.0");
+    centerWeightSlider.addChangeListener(e -> {
+      float weight = centerWeightSlider.getValue() / 100.0f;
+      centerWeightLabel.setText(String.format("Center Weight: %.2f", weight));
+      if (listener != null) listener.onCenterSampleWeightChanged(weight);
+    });
+    radarSection.add(centerWeightSlider);
+    root.add(radarSection);
+    pad(root);
+
     // Simulation settings
     JPanel simSection = section("Simulation");
 
@@ -1033,57 +1143,50 @@ public class ToolPanel extends JPanel {
     ctrlPanel.setBackground(COLOR_PANEL_BG);
     ctrlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
     
-    JButton startBtn = rowButton("Start");
-    startBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
-    startBtn.setToolTipText("Start/resume the bot simulation");
-    startBtn.getAccessibleContext().setAccessibleName("Start Simulation");
-    startBtn.getAccessibleContext().setAccessibleDescription("Start or resume the bot field simulation");
-    startBtn.addActionListener(e -> {
-      animateButtonPress(startBtn);
-      if (listener != null) listener.onSimulationStart();
+    simToggleBtn = rowButton("\u25B6 Play");
+    simToggleBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
+    simToggleBtn.setToolTipText("Start or pause the bot simulation");
+    simToggleBtn.getAccessibleContext().setAccessibleName("Toggle Simulation");
+    simToggleBtn.getAccessibleContext().setAccessibleDescription("Toggle between running and paused simulation");
+    simToggleBtn.addActionListener(e -> {
+      animateButtonPress(simToggleBtn);
+      if (listener != null) listener.onSimulationToggle();
     });
-    ctrlPanel.add(startBtn);
+    ctrlPanel.add(simToggleBtn);
     ctrlPanel.add(Box.createHorizontalStrut(4));
     
-    JButton pauseBtn = rowButton("Pause");
-    pauseBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
-    pauseBtn.setToolTipText("Pause the bot simulation");
-    pauseBtn.getAccessibleContext().setAccessibleName("Pause Simulation");
-    pauseBtn.getAccessibleContext().setAccessibleDescription("Pause the bot field simulation");
-    pauseBtn.addActionListener(e -> {
-      animateButtonPress(pauseBtn);
-      if (listener != null) listener.onSimulationPause();
-    });
-    ctrlPanel.add(pauseBtn);
-    ctrlPanel.add(Box.createHorizontalStrut(4));
-    
-    JButton resetBtn = rowButton("Reset");
+    JButton resetBtn = rowButton("\u21BA Reset");
     resetBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
-    resetBtn.setToolTipText("Reset the bot simulation (clears all bots and restarts)");
+    resetBtn.setToolTipText("Stop simulation and clear all bots and their traces");
     resetBtn.getAccessibleContext().setAccessibleName("Reset Simulation");
-    resetBtn.getAccessibleContext().setAccessibleDescription("Reset the bot field simulation to initial state");
+    resetBtn.getAccessibleContext().setAccessibleDescription("Stop simulation and remove all bots and traces");
     resetBtn.addActionListener(e -> {
       animateButtonPress(resetBtn);
-      if (confirmAction("Reset Simulation", "Clear all bots and reset simulation? This cannot be undone.")) {
-        if (listener != null) listener.onSimulationReset();
-      }
+      if (listener != null) listener.onSimulationReset();
     });
     ctrlPanel.add(resetBtn);
     
     simSection.add(ctrlPanel);
     pad(simSection);
+    
+    // Live bot counter
+    botCountLabel = rowLabel("Active: 0  |  Traces: 0");
+    botCountLabel.setForeground(COLOR_ACCENT_GREEN);
+    simSection.add(botCountLabel);
+    pad(simSection);
 
-    botSpawnRateLabel = rowLabel("Spawn Rate: 5");
-    simSection.add(botSpawnRateLabel);
-    JSlider rateSlider = rowSlider(1, 20, 5);
-    rateSlider.setToolTipText("When auto-spawn is on, how many bots spawn per cycle: 1 (rare) to 20 (frequent)");
-    rateSlider.getAccessibleContext().setAccessibleName("Bot Spawn Rate");
-    rateSlider.getAccessibleContext().setAccessibleDescription("Adjust bot auto-spawn rate from 1 to 20 bots per cycle");
-    rateSlider.addChangeListener(e -> {
-      botSpawnRateLabel.setText(String.format("Spawn Rate: %d", rateSlider.getValue()));
-      if (listener != null) listener.onBotSpawnRateChanged(rateSlider.getValue());
+    botNumberLabel = rowLabel("Bot Number: 50");
+    simSection.add(botNumberLabel);
+    JSlider numberSlider = rowSlider(1, 500, 50);
+    numberSlider.setToolTipText("Target number of active bots: during auto-spawn, bots spawn until reaching this count. When clicking 'Spawn Bot', creates this many bots at once.");
+    numberSlider.getAccessibleContext().setAccessibleName("Bot Number");
+    numberSlider.getAccessibleContext().setAccessibleDescription("Adjust target bot count from 1 to 500");
+    numberSlider.addChangeListener(e -> {
+      int num = numberSlider.getValue();
+      botNumberLabel.setText(String.format("Bot Number: %d", num));
+      if (listener != null) listener.onBotNumberChanged(num);
     });
-    simSection.add(rateSlider);
+    simSection.add(numberSlider);
     pad(simSection);
 
     JCheckBox autoSpawn = rowCheckBox("Auto Spawn", false);
@@ -1095,9 +1198,9 @@ public class ToolPanel extends JPanel {
     pad(simSection);
 
     JButton spawnBtn = rowButton("Spawn Bot");
-    spawnBtn.setToolTipText("Immediately create and add one new bot to the botfield (regardless of auto-spawn setting)");
-    spawnBtn.getAccessibleContext().setAccessibleName("Spawn New Bot");
-    spawnBtn.getAccessibleContext().setAccessibleDescription("Creates and adds a new bot to the botfield immediately");
+    spawnBtn.setToolTipText("Immediately spawn bots up to the Bot Number target (regardless of auto-spawn setting)");
+    spawnBtn.getAccessibleContext().setAccessibleName("Spawn Bots");
+    spawnBtn.getAccessibleContext().setAccessibleDescription("Spawns bots up to the configured Bot Number target");
     spawnBtn.addActionListener(e -> {
       animateButtonPress(spawnBtn);
       if (listener != null) {
@@ -1108,18 +1211,29 @@ public class ToolPanel extends JPanel {
     pad(simSection);
 
     JButton clearBotsBtn = rowButton("Clear Bots");
-    clearBotsBtn.setToolTipText("Remove all currently active bots from the botfield (cannot be undone)");
+    clearBotsBtn.setToolTipText("Remove all bots and their traces (cannot be undone)");
     clearBotsBtn.getAccessibleContext().setAccessibleName("Clear All Bots");
-    clearBotsBtn.getAccessibleContext().setAccessibleDescription("Removes all active bots from the botfield");
+    clearBotsBtn.getAccessibleContext().setAccessibleDescription("Removes all active bots and their traces");
     clearBotsBtn.addActionListener(e -> {
       animateButtonPress(clearBotsBtn);
-      if (confirmAction("Clear All Bots", "Are you sure? All active bots will be removed. This cannot be undone.")) {
-        if (listener != null) {
-          listener.onClearBots();
-        }
+      if (listener != null) {
+        listener.onClearBots();
       }
     });
     simSection.add(clearBotsBtn);
+    pad(simSection);
+    
+    JButton clearTracesBtn = rowButton("Clear Traces");
+    clearTracesBtn.setToolTipText("Clear all trace paths while keeping live bots active");
+    clearTracesBtn.getAccessibleContext().setAccessibleName("Clear Traces");
+    clearTracesBtn.getAccessibleContext().setAccessibleDescription("Clears all accumulated trace paths but keeps live bots running");
+    clearTracesBtn.addActionListener(e -> {
+      animateButtonPress(clearTracesBtn);
+      if (listener != null) {
+        listener.onClearTraces();
+      }
+    });
+    simSection.add(clearTracesBtn);
     root.add(simSection);
 
     root.add(Box.createVerticalGlue());

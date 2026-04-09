@@ -183,13 +183,13 @@ public class Bot {
     if (fieldMag > 0) fieldComponent.normalize();  // Normalize field to unit direction
     fieldComponent.scale(fieldInfluence);
     
-    // 2. Drift force: persistent random walk direction
+    // 2. Drift force: persistent random walk direction (max force = 0.25)
     Vector2D driftComponent = driftDirection.copy();  // Already unit-length
-    driftComponent.scale(driftInfluence);
+    driftComponent.scale(driftInfluence * 0.25f);
     
-    // 3. Repulsion force: avoidance of nearby traces
+    // 3. Repulsion force: avoidance of nearby traces (max force = 2.0)
     Vector2D repulsionComponent = calculateRepulsion(allBots);  // Returns unit direction or zero
-    repulsionComponent.scale(repulsionInfluence);
+    repulsionComponent.scale(repulsionInfluence * 2.0f);
     
     // --- Sum all forces (no normalize — magnitudes carry the balance) ---
     Vector2D force = fieldComponent;

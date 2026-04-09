@@ -56,10 +56,13 @@ public class BrushEngine {
       float forceX = 0, forceY = 0;
       
       if (brush.getMode() == Brush.BrushMode.BRUSH) {
-        // BRUSH mode: add forces based on mouse delta direction
+        // BRUSH mode: add forces based on mouse delta direction, scaled by velocity
         if (distance > 0) {
-          forceX = (dx / distance) * brush.getStrength();
-          forceY = (dy / distance) * brush.getStrength();
+          // Force magnitude scales with mouse velocity (distance between samples)
+          // Capped to prevent extreme forces from fast mouse movements
+          float velocityScale = Math.min(distance / brush.getSpacing(), 10.0f);
+          forceX = (dx / distance) * brush.getStrength() * velocityScale;
+          forceY = (dy / distance) * brush.getStrength() * velocityScale;
         }
       } else {
         // ERASER mode: subtract forces uniformly, moving vectors toward zero

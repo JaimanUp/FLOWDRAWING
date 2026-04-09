@@ -149,28 +149,37 @@ public class FlowDrawing extends JFrame {
       @Override public void onBotRepulsionRadiusChanged(float radius) { canvasPanel.getBotEngine().setRepulsionRadius(radius); }
       @Override public void onSpawnBot() {
         canvasPanel.getBotEngine().spawnMultipleBots();
-        setStatus("Bots spawned (x" + canvasPanel.getBotEngine().getSpawnRate() + ")");
+        setStatus("Bots spawned (x" + canvasPanel.getBotEngine().getBotNumber() + ")");
       }
       @Override public void onAutoSpawnToggle(boolean enabled) {
         canvasPanel.getBotEngine().setAutoSpawnEnabled(enabled);
         setStatus(enabled ? "Auto-spawn ON" : "Auto-spawn OFF");
       }
-      @Override public void onBotSpawnRateChanged(int rate)           { canvasPanel.getBotEngine().setSpawnRate(rate); }
+      @Override public void onBotNumberChanged(int number) {
+        canvasPanel.getBotEngine().setBotNumber(number);
+        setStatus("Bot number set to: " + number);
+      }
       @Override public void onClearBots() {
         canvasPanel.clearBots();
+        toolPanel.updateSimulationState(canvasPanel.getBotEngine().isSimulationRunning());
         setStatus("Bots cleared");
       }
-      @Override public void onSimulationStart() {
-        canvasPanel.getBotEngine().startSimulation();
-        setStatus("Simulation running");
-      }
-      @Override public void onSimulationPause() {
-        canvasPanel.getBotEngine().pauseSimulation();
-        setStatus("Simulation paused");
+      @Override public void onSimulationToggle() {
+        boolean nowRunning = canvasPanel.getBotEngine().toggleSimulation();
+        toolPanel.updateSimulationState(nowRunning);
+        setStatus(nowRunning ? "Simulation running" : "Simulation paused");
       }
       @Override public void onSimulationReset() {
         canvasPanel.getBotEngine().resetSimulation();
-        setStatus("Simulation reset");
+        canvasPanel.getLayerRenderer().clearBots();
+        toolPanel.updateSimulationState(false);
+        toolPanel.updateBotCount(0, 0);
+        setStatus("Simulation reset — all bots and traces cleared");
+      }
+      @Override public void onClearTraces() {
+        canvasPanel.getBotEngine().clearTraces();
+        canvasPanel.getLayerRenderer().clearBots();
+        setStatus("Traces cleared");
       }
       @Override public void onBotLuminanceDecayToggle(boolean enabled) {
         canvasPanel.getBotEngine().setLuminanceDecayEnabled(enabled);
@@ -179,6 +188,33 @@ public class FlowDrawing extends JFrame {
       @Override public void onBotTraceFadeToggle(boolean enabled) {
         canvasPanel.setTraceFadeEnabled(enabled);
         setStatus(enabled ? "Trace fade ON" : "Trace fade OFF");
+      }
+      
+      // Radar sampling methods
+      @Override public void onRadarSamplingFalloffChanged(String falloffType) {
+        field.VectorField.FalloffType type;
+        try {
+          type = field.VectorField.FalloffType.valueOf(falloffType.toUpperCase().replace(" ", "_"));
+        } catch (IllegalArgumentException e) {
+          type = field.VectorField.FalloffType.GAUSSIAN;  // Default
+        }
+        canvasPanel.getBotEngine().setRadarSamplingFalloff(type);
+        setStatus("Radar sampling falloff: " + falloffType);
+      }
+      
+      @Override public void onRadarSamplesChanged(int numSamples) {
+        canvasPanel.getBotEngine().setRadarSamples(numSamples);
+        setStatus("Radar samples: " + numSamples);
+      }
+      
+      @Override public void onRadarSampleDistanceChanged(float distance) {
+        canvasPanel.getBotEngine().setRadarSampleDistance(distance);
+        setStatus(String.format("Sample distance: %.2f", distance));
+      }
+      
+      @Override public void onCenterSampleWeightChanged(float weight) {
+        canvasPanel.getBotEngine().setCenterSampleWeight(weight);
+        setStatus(String.format("Center sample weight: %.2f", weight));
       }
     });
 
@@ -481,6 +517,17 @@ public class FlowDrawing extends JFrame {
         }
         botEngine.update();
         
+        // Update UI bot counter (every 15 frames to avoid EDT spam)
+        if (frameCount % 15 == 0) {
+          FlowDrawing parent = getParentFrame();
+          if (parent != null && parent.toolPanel != null) {
+            parent.toolPanel.updateBotCount(
+              botEngine.getActiveBotCount(),
+              botEngine.getDeadBotCount()
+            );
+          }
+        }
+        
         repaint();
         try {
           Thread.sleep(16); // ~60 FPS
@@ -610,6 +657,18 @@ public class FlowDrawing extends JFrame {
     // Layer renderer accessor for background image management
     public render.LayerRenderer getLayerRenderer() {
       return layerRenderer;
+    }
+    
+    // Get the parent FlowDrawing frame for accessing toolPanel
+    private FlowDrawing getParentFrame() {
+      java.awt.Container parent = getParent();
+      while (parent != null) {
+        if (parent instanceof FlowDrawing) {
+          return (FlowDrawing) parent;
+        }
+        parent = parent.getParent();
+      }
+      return null;
     }
     
     // Zoom by a relative factor (used by menu bar actions)

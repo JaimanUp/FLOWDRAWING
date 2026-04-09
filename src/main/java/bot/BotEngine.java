@@ -29,8 +29,14 @@ public class BotEngine {
   
   // Spawn configuration
   private boolean autoSpawnEnabled = false;
-  private int spawnRate = 5;      // Bots per frame
-  private int maxBots = 500;
+  private int botNumber = 50;     // Target number of active bots (auto-spawn goal) or bots to spawn (manual spawn)
+  private int maxBots = 500;      // Hard cap on total bots
+  
+  // Radar sampling configuration
+  private VectorField.FalloffType radarSamplingFalloff = VectorField.FalloffType.GAUSSIAN;
+  private int radarSamples = config.Config.RADAR_SAMPLES;  // Number of radial samples (default 16)
+  private float radarSampleDistance = 0.7f;  // Sample at this fraction of radar radius (0.0-1.0)
+  private float centerSampleWeight = 1.5f;  // Extra weight for center sample for stability
   
   // Simulation control
   private boolean simulationRunning = true;  // Start running by default
@@ -54,9 +60,9 @@ public class BotEngine {
       return;
     }
     
-    // Spawn new bots if auto-spawn enabled
+    // Spawn new bots if auto-spawn enabled (until reaching target botNumber)
     if (autoSpawnEnabled) {
-      for (int i = 0; i < spawnRate && bots.size() < maxBots; i++) {
+      while (bots.size() < botNumber && bots.size() < maxBots) {
         spawnRandomBot();
       }
     }
@@ -121,32 +127,33 @@ public class BotEngine {
   
   /**
    * Sample vector field using radar-based multi-point aggregation.
-   * Takes 16 radial samples around the bot and combines them using distance-based weighting.
+   * Takes multiple radial samples around the bot and combines them using distance-based weighting.
+   * Supports different falloff types (Linear, Gaussian, Hard Edge) for flexible motion characteristics.
    * @param centerPosition The center position to sample around
    * @param radarRadius The radius of the sampling area
    * @return Aggregated vector from all samples
    */
   private Vector2D sampleFieldWithRadar(Vector2D centerPosition, float radarRadius) {
-    // Use 16 radial samples around the bot position
-    int numSamples = 16;
+    // Use configured number of radial samples around the bot position
     Vector2D aggregatedForce = new Vector2D(0, 0);
     float totalWeight = 0;
     
-    for (int i = 0; i < numSamples; i++) {
+    // Take radial samples around the bot
+    for (int i = 0; i < radarSamples; i++) {
       // Calculate angle for this sample
-      float angle = (float) (2 * Math.PI * i / numSamples);
+      float angle = (float) (2 * Math.PI * i / radarSamples);
       
       // Calculate sample position within radar radius
-      float sampleDist = radarRadius * 0.7f;  // Sample at 70% of radar radius
+      float sampleDist = radarRadius * radarSampleDistance;  // Sample at configured fraction of radius
       float sampleX = centerPosition.vx + (float)(Math.cos(angle) * sampleDist);
       float sampleY = centerPosition.vy + (float)(Math.sin(angle) * sampleDist);
       
-      // Sample the field at this position
+      // Sample the field at this position using bilinear interpolation
       Vector2D fieldSample = sampleFieldBilinear(new Vector2D(sampleX, sampleY));
       
-      // Calculate distance-based weight (Linear falloff: closer = higher weight)
+      // Calculate distance-based weight using configured falloff type
       float distance = sampleDist;
-      float weight = Math.max(0, 1.0f - (distance / radarRadius));
+      float weight = calculateRadarFalloff(distance, radarRadius);
       
       // Accumulate weighted sample
       fieldSample.scale(weight);
@@ -154,18 +161,48 @@ public class BotEngine {
       totalWeight += weight;
     }
     
-    // Also include center sample with full weight for stability
+    // Include center sample with configured extra weight for stability
     Vector2D centerSample = sampleFieldBilinear(centerPosition);
-    centerSample.scale(1.5f);  // Center sample has more influence
+    centerSample.scale(centerSampleWeight);  // Center sample has extra influence
     aggregatedForce.add(centerSample);
-    totalWeight += 1.5f;
+    totalWeight += centerSampleWeight;
     
-    // Normalize by total weight
+    // Normalize by total weight to get average field influence
     if (totalWeight > 0) {
       aggregatedForce.scale(1.0f / totalWeight);
     }
     
     return aggregatedForce;
+  }
+  
+  /**
+   * Calculate falloff weight for radar sampling based on distance and configured falloff type.
+   * @param distance Distance from center (0 to radarRadius)
+   * @param radarRadius The maximum radar radius
+   * @return Weight value (0.0 to 1.0) for this sample
+   */
+  private float calculateRadarFalloff(float distance, float radarRadius) {
+    float normalized = distance / radarRadius;  // 0 to 1 (though we typically sample < radarRadius)
+    normalized = Math.max(0, Math.min(1, normalized));  // Clamp to [0,1]
+    
+    switch (radarSamplingFalloff) {
+      case LINEAR:
+        // Linear: 1 at center, 0 at edge
+        return 1.0f - normalized;
+        
+      case GAUSSIAN:
+        // Gaussian: smoother falloff, emphasizes center more
+        // Using sigma = 0.5 for appropriate falloff curve
+        float sigma = 0.5f;
+        return (float) Math.exp(-(normalized * normalized) / (2 * sigma * sigma));
+        
+      case HARD_EDGE:
+        // Hard edge: constant weight (flat weighting)
+        return 1.0f;
+        
+      default:
+        return 1.0f - normalized;  // Default to linear
+    }
   }
   
   /**
@@ -277,10 +314,10 @@ public class BotEngine {
   }
   
   /**
-   * Spawn multiple bots based on spawn rate
+   * Spawn multiple bots based on bot number (exactly botNumber bots)
    */
   public void spawnMultipleBots() {
-    for (int i = 0; i < spawnRate && bots.size() < maxBots; i++) {
+    for (int i = 0; i < botNumber && bots.size() < maxBots; i++) {
       spawnRandomBot();
     }
   }
@@ -291,6 +328,24 @@ public class BotEngine {
   public void clearBots() {
     bots.clear();
     deadBots.clear();
+  }
+  
+  /**
+   * Clear only dead bot traces, keeping live bots.
+   */
+  public void clearTraces() {
+    deadBots.clear();
+    // Clear path history of live bots (keep only current position)
+    synchronized (bots) {
+      for (Bot bot : bots) {
+        java.util.ArrayList<Bot.TracePoint> path = bot.getPath();
+        if (path != null && path.size() > 1) {
+          Bot.TracePoint last = path.get(path.size() - 1);
+          path.clear();
+          path.add(last);
+        }
+      }
+    }
   }
   
   // Getters
@@ -306,8 +361,16 @@ public class BotEngine {
     return bots.size();
   }
   
+  public int getBotNumber() {
+    return botNumber;
+  }
+  
+  /**
+   * @deprecated Use getBotNumber() instead
+   */
+  @Deprecated
   public int getSpawnRate() {
-    return spawnRate;
+    return botNumber;
   }
   
   // Setters
@@ -343,8 +406,16 @@ public class BotEngine {
     this.autoSpawnEnabled = enabled;
   }
   
+  public void setBotNumber(int number) {
+    this.botNumber = Math.max(1, Math.min(number, maxBots));
+  }
+  
+  /**
+   * @deprecated Use setBotNumber() instead
+   */
+  @Deprecated
   public void setSpawnRate(int rate) {
-    this.spawnRate = Math.max(1, rate);
+    setBotNumber(rate);
   }
   
   public void setMaxBots(int max) {
@@ -360,13 +431,40 @@ public class BotEngine {
     this.simulationRunning = false;
   }
   
+  /**
+   * Toggle between running and paused states.
+   * @return true if simulation is now running, false if paused
+   */
+  public boolean toggleSimulation() {
+    this.simulationRunning = !this.simulationRunning;
+    return this.simulationRunning;
+  }
+  
+  /**
+   * Reset simulation: stop, clear all bots and their traces.
+   */
   public void resetSimulation() {
-    this.simulationRunning = true;
+    this.simulationRunning = false;
     this.bots.clear();
+    this.deadBots.clear();
   }
   
   public boolean isSimulationRunning() {
     return simulationRunning;
+  }
+  
+  /**
+   * Get the number of currently active (alive) bots.
+   */
+  public int getActiveBotCount() {
+    return bots.size();
+  }
+  
+  /**
+   * Get the number of dead bots (traces preserved).
+   */
+  public int getDeadBotCount() {
+    return deadBots.size();
   }
   
   // Background image and luminance decay
@@ -376,6 +474,90 @@ public class BotEngine {
   
   public void setLuminanceDecayEnabled(boolean enabled) {
     this.luminanceDecayEnabled = enabled;
+  }
+  
+  // Radar sampling configuration
+  /**
+   * Set the falloff type used for radar sampling.
+   * Affects how distance-based weighting is applied to field samples.
+   * @param falloff The falloff type (LINEAR, GAUSSIAN, or HARD_EDGE)
+   */
+  public void setRadarSamplingFalloff(VectorField.FalloffType falloff) {
+    if (falloff != null) {
+      this.radarSamplingFalloff = falloff;
+    }
+  }
+  
+  /**
+   * Get the current falloff type for radar sampling.
+   */
+  public VectorField.FalloffType getRadarSamplingFalloff() {
+    return radarSamplingFalloff;
+  }
+  
+  /**
+   * Set the number of radial samples to take around each bot.
+   * More samples = smoother motion but more computation.
+   * @param samples Number of samples (typically 8-32)
+   */
+  public void setRadarSamples(int samples) {
+    this.radarSamples = Math.max(1, samples);
+  }
+  
+  /**
+   * Get the current number of radar samples.
+   */
+  public int getRadarSamples() {
+    return radarSamples;
+  }
+  
+  /**
+   * Set the distance at which samples are taken relative to radar radius.
+   * 0.7 means samples are taken at 70% of radar radius.
+   * @param distance Fraction of radar radius (0.0-1.0)
+   */
+  public void setRadarSampleDistance(float distance) {
+    this.radarSampleDistance = Math.max(0.1f, Math.min(1.0f, distance));
+  }
+  
+  /**
+   * Get the current radar sample distance fraction.
+   */
+  public float getRadarSampleDistance() {
+    return radarSampleDistance;
+  }
+  
+  /**
+   * Set the extra weight multiplier for the center sample.
+   * Higher values emphasize the center position over surrounding samples.
+   * @param weight Weight multiplier (typically 1.0-3.0)
+   */
+  public void setCenterSampleWeight(float weight) {
+    this.centerSampleWeight = Math.max(0.1f, weight);
+  }
+  
+  /**
+   * Get the current center sample weight.
+   */
+  public float getCenterSampleWeight() {
+    return centerSampleWeight;
+  }
+  
+  /**
+   * Get the current radar sampling falloff type as a string.
+   * Useful for UI display.
+   */
+  public String getRadarSamplingFalloffName() {
+    switch (radarSamplingFalloff) {
+      case LINEAR:
+        return "Linear";
+      case GAUSSIAN:
+        return "Gaussian";
+      case HARD_EDGE:
+        return "Hard Edge";
+      default:
+        return "Unknown";
+    }
   }
   
   /**

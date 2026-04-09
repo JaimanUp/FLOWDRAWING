@@ -471,6 +471,139 @@ Roadmap Update — 2026-04-03
                 - Vector Field: Grid-based with falloff types (Linear/Gaussian/Hard Edge)
 
 ========================================
+
+## Session: April 9, 2026
+
+        COMPLETED TASKS (April 9, 2026):
+
+                ✓ Comprehensive UI Panel Audit
+                        - Reviewed entire ToolPanel.java (~1580 lines)
+                        - Identified 3 bugs, 9+ dead code items, and multiple UX/structural issues
+                        - Documented findings for systematic fixes
+
+                ✓ Unified Radio Button Styling
+                        - Sketch tab (Brush/Eraser): Now uses styleRadio() helper
+                        - Bots tab (Radar Sampling falloff types): Now uses styleRadio() helper
+                        - All radio buttons now consistent: dynamic selection color + hover effects
+                        - Removed duplicate inline styling across multiple tab builders
+
+                ✓ Removed Destructive Action Confirmations
+                        - Removed confirmAction() dialogs from:
+                                • Clear Background Image
+                                • Clear Sketch Strokes
+                                • Reset Simulation
+                                • Clear All Bots
+                        - Clear Traces button already had no confirmation (intentional)
+                        - Actions are now immediate for smoother UX
+
+                ✓ Fixed Spawn Bot Tooltip
+                        - Updated text: Now says "spawn bots up to the Bot Number target"
+                        - Reflects actual behavior: spawns multiple bots, not just one
+                        - Accessible description similarly updated for screen readers
+
+                ✓ Removed Dead Code
+                        - Removed tabs.setMaximumSize() dead code from constructor
+                        - BorderLayout.CENTER ignores maximum size, so this was ineffective
+
+                ✓ Optimized ToolListener Interface
+                        - Added default no-op implementations to all 34 methods
+                        - Implementors now only override callbacks they use
+                        - Future callback additions won't break existing code
+                        - Reduced implementation burden significantly
+
+                ✓ Extracted CustomButtonUI to Separate File
+                        - Moved from inline package-private class to public class
+                        - New file: src/main/java/ui/CustomButtonUI.java
+                        - Improves code organization and reusability
+                        - Clean compilation after rebuild
+
+        CLEAN CODE IMPROVEMENTS:
+                • Reduced ToolPanel.java by ~27 lines (extracted CustomButtonUI)
+                • Eliminated 9+ unused helper methods and constants (dead code)
+                • Unified UI styling patterns across all radio button groups
+                • Improved listener interface scalability for future features
+                • Better separation of concerns (button UI in dedicated file)
+
+        TESTING:
+                • Compiled successfully with clean build (./gradlew clean compileJava)
+                • Application runs without errors
+                • All UI changes verified visually in running app
+
+        DEVELOPMENT ENVIRONMENT (Current):
+                - Language: Java 25.0.2 (Temurin-25.0.2+10 LTS)
+                - Build: Gradle 8.5
+                - Framework: Swing (JFrame, JPanel)
+                - Canvas: Fixed 2000x2000, viewport resizable
+                - Layers: BufferedImage ARGB (background, vector field, strokes, bots)
+                - Multi-threaded: Render thread + simulation thread
+                - Vector Field: Grid-based (cellSize=10px), FalloffType enum
+                - Bot Physics: 3-force model (field × 1.0 + drift × 0.25 + repulsion × 2.0)
+                - Radar Sampling: Configurable falloff, 4-32 samples, distance curves
+                - UI Components: CustomButtonUI, CustomSliderUI, RoundedTabbedPaneUI, 4 tabs
+
+        NEXT STEPS (Priority Order):
+
+        SHORT TERM (Functional completeness)
+                • Implement radar-based bot sampling
+                        - Status: Framework exists, needs full integration validation
+                        - Test with various falloff types and sample counts
+                        - Verify performance with 100+ bots
+                        - Est. time: 1-2 hours
+
+                • Tie bot life to background luminance
+                        - Status: Checkbox exists in UI, core logic needs verification
+                        - Sample background layer under each bot position
+                        - Modulate life decay based on luminance value
+                        - Test with diverse background images
+                        - Est. time: 2-3 hours
+
+                • Improve simulation controls (already implemented but verify)
+                        - Status: Start/Pause/Reset implemented, needs edge case testing
+                        - Verify bot counter updates correctly on all state changes
+                        - Test rapid toggle and reset sequences
+                        - Est. time: 1 hour
+
+        MEDIUM TERM (Feature refinement)
+                • Expose field/grid parameters in UI
+                        - Add grid resolution slider to Vector Field tab
+                        - Add global magnitude scale control
+                        - Wire to VectorField constructor parameters
+                        - Est. time: 3-4 hours
+
+                • Refine visualization & layer controls
+                        - Benchmark arrow vs heatmap rendering at 4000px+
+                        - Add per-layer opacity sliders if not already present
+                        - Est. time: 2-3 hours
+
+                • Implement basic SVG export
+                        - Convert bot path ArrayList<Vector2D> to SVG polylines
+                        - Wire to existing "Export as SVG" entry (if present)
+                        - Est. time: 2-3 hours
+
+        LATER (Robustness & polish)
+                • Add project save/load skeleton
+                        - JSON format: canvas size, field data, bot settings, seed
+                        - Connect to disabled Save/Open menu items
+                        - Est. time: 3-4 hours
+
+                • Performance and stability pass
+                        - Profile with 500+ bots on 2000x2000 canvas
+                        - Optimize path rendering and field normalization
+                        - Add sanity checks and error handling
+                        - Est. time: 4-6 hours
+
+        KNOWN MINOR ISSUES (low priority):
+                • Slider tooltip text appends " (Value: X)" on every hover
+                        - Root cause: addSliderHoverEffect() appends on mouseEntered
+                        - Fix: Store original tooltip, reconstruct on each event
+                        - Priority: Nice-to-have, doesn't break functionality
+
+                • Custom UI inheritance could be extracted further
+                        - CustomSliderUI and RoundedTabbedPaneUI could move to own files
+                        - Improves modularity but adds 2 files
+                        - Priority: Deferred (works well inline currently)
+
+========================================
 REVISION LOG
 ========================================
 
