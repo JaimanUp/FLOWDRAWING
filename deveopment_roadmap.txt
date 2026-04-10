@@ -1,6 +1,121 @@
 Development Roadmap
 Flow-Guided Generative Drawing Engine
 
+================================================================================
+SESSION LOG - April 10, 2026
+================================================================================
+
+PHASE 1 TOOLPANEL REFACTOR - COMPLETE ✓
+────────────────────────────────────────────────────────────────────────────
+
+WHAT WAS COMPLETED:
+  ✓ Phase 1: Core ToolPanel Architecture (3-level hierarchy)
+    - Layer tabs (BKGD, VECFD, BOTFD) - BorderLayout wrapper fix applied
+    - Tool ribbon with visibility toggle (☑/☐ independent per layer)
+    - Dynamic scrollable settings panel
+    - All 40+ listener callbacks preserved and wired
+
+  ✓ Phase 1a: Tool-Specific Settings
+    - BKGD: Color, Image, Clear tools with appropriate buttons
+    - VECFD: Paint, Erase, Overlay, Clean, Random, Reset tools
+      * All now have falloff buttons (Linear, Gaussian, Hard) 
+      * All have Size/Hardness/Strength sliders
+    - BOTFD: Place, Random, Auto, Clear, Export tools (stub implementations)
+
+  ✓ Phase 1b: Transparency Callbacks
+    - Per-layer transparency slider routing working
+    - Fires correct listener: onXXXTransparencyChanged()
+
+  ✓ Phase 1c: Layer Visibility Toggle
+    - ☑/☐ icon tracks state per layer independently
+    - Fires onXXXToggle(boolean) callbacks correctly
+
+  ✓ Phase 1d: Integration Testing & Bug Fixes
+    - Fixed BorderLayout bug (multiple NORTH components)
+    - Created BoxLayout wrapper for layer tabs + tool ribbon
+    - Compiled successfully with Java 11 (converted from Java 14+ syntax)
+    - Application launches and displays correctly
+    - Builds with no errors
+
+CODE CHANGES:
+  - File: src/main/java/ui/ToolPanel.java
+    Size: ~28KB (refactored, down from 69KB original)
+    Backup: ToolPanel.java.backup (preserved)
+    
+  - New files created:
+    docs/PHASE_1_COMPLETION_SUMMARY.md (technical documentation)
+
+GIT STATUS:
+  - Branch: master (changes integrated to working codebase)
+  - Recommendation: Commit Phase 1 as "Phase 1: Tool-Centric UI Architecture"
+
+────────────────────────────────────────────────────────────────────────────
+
+NEXT SESSION PRIORITIES:
+────────────────────────────────────────────────────────────────────────────
+
+1. **CRITICAL: Review TestUI.md & Implement Complete Tool Settings**
+   
+   Current state: Basic framework with simplified settings
+   Target state: Full detailed settings per TestUI.md specification
+   
+   TODO per tool layer:
+   
+   BKGD LAYER:
+   - Color tool: Needs color picker (popup) - currently just button stub
+   - Image tool: Needs image load dialog - currently just button stub
+   
+   VECFD LAYER: (MOSTLY DONE - verify against TestUI)
+   - Paint: ✓ Has falloff + sliders - verify matches TestUI exactly
+   - Erase: NEEDS CHECK - should match Paint settings
+   - Overlay: ✓ Has falloff + sliders
+   - Clean: ✓ Has falloff + sliders
+   - Random: ✓ Has falloff + sliders
+   - Reset: ✓ Simple button
+   
+   BOTFD LAYER: (NEEDS FULL EXPANSION)
+   - Place: Should have:
+     * General: Amount, Transparency, Color picker
+     * Force Balance: Vectorfield, Repulsion, Drifting sliders
+     * Life: Duration, Velocity, Illuminance decay
+     * Field Radar: Falloff buttons, Radius, Hardness, Strength
+     * Repulsion Radar: Falloff buttons, Radius, Hardness, Samples
+     * Drifting: Mode buttons, Velocity, Strength
+   
+   - Random: Same as Place (full settings)
+   
+   - Auto: ✓ Has Start button and bot counter - verify functional
+   
+   - Clear: ✓ Has Clear Bots and Clear Traces buttons
+   
+   - Export: Needs implementation
+
+2. **Test All Callbacks Fire Correctly**
+   - Verify layer switching fires no errors
+   - Verify tool switching updates settings
+   - Verify visibility toggle fires layer callbacks
+   - Verify transparency slider wires to correct callback
+   - Check console for any missing method implementations
+
+3. **Listener Implementation Status Check**
+   - Go through FlowDrawing.java ToolListener implementation
+   - Mark which callbacks are stubs vs. which are actually wired
+   - Update stubs like "onBackgroundTransparencyChanged" with real behavior
+
+4. **UI Polish (If Time)**
+   - Test visibility toggle persistence across layer switches
+   - Verify button hover effects work
+   - Check scrollable panel scrolls smoothly
+   - Test responsiveness when resizing window
+
+IMPLEMENTATION NOTES FOR NEXT SESSION:
+- Reference file: docs/TestUI.md for exact specifications
+- Reference file: docs/PHASE_1_COMPLETION_SUMMARY.md for architecture
+- Reference file: gui_menu_design.txt for tool definitions
+- Current code is clean and extensible - expanding settings should be straightforward
+
+================================================================================
+
 # Prototype Direction
 - This document is targeted at a **quick prototype** using Java and Processing as originally proposed.
 - Core subsystems (vector field, bots, brushes) will follow the designs described below without major deviations.

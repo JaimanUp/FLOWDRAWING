@@ -83,163 +83,342 @@ Notes:
 
 --------------------------------------------------
 
-## 3. Left Vertical Tool Panel
+## 3. Left Vertical Tool Panel (Tool-Centric Architecture)
 
-This is the main control surface for the creative workflow.
+This is the main control surface for the creative workflow. Uses a hierarchical tool-ribbon approach.
 
-### Tab Structure
-- Background
-- Vector Field
-- Sketch
-- Botfield
+### Three-Level Structure
 
-Behavior:
-- Tabs appear at the top of the left panel.
-- Clicking a tab switches the visible tool group below it.
-- The panel remains fixed on the left side.
-- Controls should be stacked vertically and grouped clearly.
+#### Level 1: Layer Tabs (Top - Fixed)
+- BKGD (Background)
+- VECFD (Vector Field)
+- BOTFD (Bot Field)
+
+**Behavior**:
+- Layer tabs appear at the top of the left panel
+- Clicking a tab switches the tool ribbon and settings below
+- Only one layer tab active at a time
+- Visually indicated: selected tab highlighted in neon green
+
+#### Level 2: Tool Icon Ribbon (Fixed)
+- First icon: **Visibility toggle** (☑/☐) - toggles layer visibility
+- Remaining icons: Tool selection icons (paint, erase, place, etc.)
+- Each layer has different tools
+
+**Behavior**:
+- Tools appear as small icon buttons (32-44px square)
+- Visibility icon is always first in ribbon
+- Clicking visibility toggles layer on/off (doesn't change tool)
+- Clicking a tool icon selects that tool and updates settings below
+- Selected tool highlighted in neon green
+- Inactive tools shown in gray
+
+#### Level 3: Settings Panel (Scrollable)
+- Dynamically changes based on selected tool
+- Always includes: **Transparency slider** (layer-level)
+- Tool-specific controls below (size, hardness, strength, etc.)
+
+**Behavior**:
+- The panel remains fixed on the left side
+- Contents update when tool is clicked (no expanding/collapsing)
+- Scrollable if content exceeds panel height
+- Scroll position resets per tool for consistency
 
 --------------------------------------------------
 
-## 4. Background Tab
+## 4. Background Layer (BKGD)
 
 Purpose:
 - Manage the reference or visual background layer behind all simulation and drawing layers.
 
-Controls:
-- Show / Hide
-- Transparency
-- Colour
-- Load Image
-- Clear Image
+### Tool Ribbon
 
-Implementation notes:
-- Show / Hide controls visibility of the background layer.
-- Transparency adjusts background opacity.
-- Colour sets a solid background color when no image is loaded or when combined with the image.
-- Load Image imports an image file into the background layer.
-- Clear Image removes only the loaded image, not necessarily the background color.
+```
+[ ☑ ] [ ● Color ] [ • Image ] [ • Clear ]
+ ↑       ↑          ↑           ↑
+ |       |          |           └─ Clear layer button
+ |       |          └─ Load/manage background image
+ |       └─ Select solid background color
+ └─ Visibility toggle
+```
+
+### Tools & Settings
+
+#### Color Tool (Selected by default)
+- **Purpose**: Set background color
+- **Settings**:
+  - Transparency slider (layer-level)
+  - Color picker button
+
+#### Image Tool
+- **Purpose**: Load and manage background image
+- **Settings**:
+  - Transparency slider (layer-level)
+  - Load Image button
+  - Clear Image button
+
+#### Clear Tool
+- **Purpose**: Clear layer
+- **Settings**:
+  - Confirmation message
+  - Clear button
+
+### Visibility Toggle Behavior
+- Clicking eye icon (☑/☐) hides/shows background layer
+- Doesn't affect which tool is selected
+- Transparency still applies when layer is visible
 
 --------------------------------------------------
 
-## 5. Vector Field Tab
+## 5. Vector Field Layer (VECFD)
 
 Purpose:
-- Control how the vector field is displayed and initialized.
+- Control how the vector field is displayed, visualized, and edited.
 
-Controls:
-- Show / Hide
-- Transparency
-- Visualization Mode
-	- Arrow
-	- Heatmap
-- Reset
-- Random
+### Tool Ribbon
 
-Implementation notes:
-- Show / Hide controls the visibility of the field overlay.
-- Transparency changes the opacity of the field rendering.
-- Visualization Mode switches between directional arrows and a color-based field map.
-- Reset clears the field back to zero.
-- Random generates a randomized vector field state for experimentation.
+```
+[ ☑ ] [ ● Paint ] [ • Erase ] [ • Overlay ] [ • Clean ] [ • Random ] [ • Reset ]
+ ↑       ↑
+ |       └─ Draw field forces with brush
+ └─ Visibility toggle
+```
 
-Note:
-- The current code uses Arrow and Flow Map modes. The GUI can label this mode as Arrow / Heatmap if that terminology is preferred, but the implementation should stay consistent.
+### Tools & Settings
+
+#### Paint Tool (Default)
+- **Purpose**: Draw force vectors into the field
+- **Settings**:
+  - Transparency slider (layer-level)
+  - Falloff Type toggle: Linear | Gaussian | Hard Edge
+  - Size slider (brush size)
+  - Hardness slider (falloff shape)
+  - Strength slider (force magnitude)
+
+#### Erase Tool
+- **Purpose**: Remove/reduce field vectors
+- **Settings**:
+  - Transparency slider (layer-level)
+  - Falloff Type toggle: Linear | Gaussian | Hard Edge
+  - Size slider
+  - Hardness slider
+  - Strength slider
+
+#### Overlay Tool
+- **Purpose**: Fill region with field force
+- **Settings**:
+  - Transparency slider (layer-level)
+  - Falloff Type toggle: Linear | Gaussian | Hard Edge
+  - Size slider
+  - Hardness slider
+  - Strength slider
+
+#### Clean Tool
+- **Purpose**: Normalize/clean field without erasing
+- **Settings**:
+  - Transparency slider (layer-level)
+  - Falloff Type toggle: Linear | Gaussian | Hard Edge
+  - Size slider
+  - Hardness slider
+  - Strength slider
+
+#### Random Tool
+- **Purpose**: Generate randomized field
+- **Settings**:
+  - Transparency slider (layer-level)
+  - Falloff Type toggle: Linear | Gaussian | Hard Edge
+  - Size slider
+  - Hardness slider
+  - Strength slider
+
+#### Reset Tool
+- **Purpose**: Clear entire field to zero
+- **Settings**:
+  - Confirmation message
+  - Reset button
+
+### Visualization
+- Arrow mode: Shows directional vectors
+- Heatmap mode: Shows magnitude as color intensity
+- Mode toggle in View menu (not in sidepanel)
+
+### Visibility Toggle Behavior
+- Clicking eye icon shows/hides field layer
+- Tool selection remains unchanged
+- Transparency still applies when field is visible
 
 --------------------------------------------------
 
-## 6. Sketch Tab
+## 6. Bot Field Layer (BOTFD)
 
 Purpose:
-- Control the user drawing layer and brush behavior.
+- Control bot-generated drawing layer and simulation behavior through various bot spawning and modification tools.
 
-Controls:
-- Show / Hide
-- Transparency
-- Brush / Erase Settings
-- Clear
+### Tool Ribbon
 
-Implementation notes:
-- Show / Hide controls the sketch layer visibility.
-- Transparency controls opacity of the stroke layer.
-- Brush / Erase Settings opens or reveals controls for:
-	- Brush size
-	- Brush hardness
-	- Brush strength
-	- Erase mode [planned]
-- Clear removes all sketch strokes.
+```
+[ ☑ ] [ ● Place ] [ • Random ] [ • Auto ] [ • Clear ] [ • Export ]
+ ↑      ↑
+ |      └─ Place bots manually
+ └─ Visibility toggle
+```
 
-Note:
-- Existing brush sliders already cover part of this tab and should move into this section during GUI refactor.
+### Tools & Settings
 
---------------------------------------------------
+#### Place Tool (Default)
+- **Purpose**: Manually place bots one at a time
+- **Settings**:
+  - Transparency slider (layer-level)
+  - **General Settings**:
+    - Amount slider (number of bots to place)
+    - Color picker button
+  - **Force Balance Settings**:
+    - Vector Field influence slider
+    - Repulsion influence slider
+    - Drifting influence slider
+  - **Life Settings**:
+    - Duration slider (bot lifespan)
+    - Velocity slider (movement speed)
+    - Illuminance decay slider
+  - **Field Radar Settings**:
+    - Radar falloff type: Linear | Gaussian | Hard Edge
+    - Radar radius slider
+    - Hardness (center weight) slider
+    - Strength slider
+  - **Repulsion Radar Settings**:
+    - Repulsion falloff type: Linear | Gaussian | Hard Edge
+    - Repulsion radius slider
+    - Hardness slider
+    - Strength slider
+  - **Drifting Settings**:
+    - Drifting mode: Unique | Collective | Canvas
+    - Velocity slider
+    - Strength slider
+  - [Show More ▼] for additional parameters
 
-## 7. Botfield Tab
+#### Random Tool
+- **Purpose**: Randomly spawn bots across canvas
+- **Settings**: Same as Place tool
 
-Purpose:
-- Control the bot-generated drawing layer and simulation behavior.
+#### Auto Tool
+- **Purpose**: Continuously spawn bots automatically
+- **Settings**:
+  - Transparency slider (layer-level)
+  - **Control**: Play | Pause buttons
+  - Same settings as Place tool below
 
-Controls:
-- Show / Hide
-- Transparency
-- Bot Settings
-- Simulation Settings
+#### Clear Tool
+- **Purpose**: Delete all bots or traces
+- **Settings**:
+  - Clear Bots button
+  - Clear Traces button
 
-Implementation notes:
-- Show / Hide controls visibility of bot paths and bot markers.
-- Transparency controls bot layer opacity.
-- Bot Settings groups controls such as:
-	- Bot life
-	- Radar
-	- Drift
-	- Speed
-- Simulation Settings groups controls such as:
-	- Spawn Bot
-	- Auto Spawn
-	- Spawn Rate
-	- Start / Stop simulation [planned if needed separately]
+#### Export Tool
+- **Purpose**: Export bot paths and data
+- **Settings**:
+  - Export format selector
+  - Export button
 
-Note:
-- Existing bot controls already cover part of this tab and should move into this section during GUI refactor.
-
---------------------------------------------------
-
-## 8. Layout Behavior Guidelines
-
-- The top menu bar handles general application actions.
-- The left vertical panel handles layer-specific and tool-specific actions.
-- The current horizontal control strip should be retired once its controls are moved into the left tabbed panel.
-- The central canvas must stay visually dominant.
-- The left panel should be compact but scrollable if controls exceed available height.
-- Each tab should use consistent control groupings:
-	- Visibility
-	- Appearance
-	- Layer actions
-	- Advanced settings
-
---------------------------------------------------
-
-## 9. Recommended First Implementation Order
-
-1. Add a real top menu bar with File, Edit, View, and Help.
-2. Replace the current horizontal control strip with a left-side vertical panel.
-3. Add the four tab sections.
-4. Move existing controls into their correct tabs.
-5. Add missing controls such as transparency and random field generation.
+### Visibility Toggle Behavior
+- Clicking eye icon shows/hides bot layer
+- Tool selection remains unchanged
+- Transparency still applies when layer is visible
 
 --------------------------------------------------
 
-## 10. Open Design Decisions
+## 7. Layout Behavior Guidelines
 
-- Should the left panel have icons as well as text labels?
-- Should each tab open inline controls or collapsible groups?
-- Should transparency be a slider from 0 to 100 for each layer?
-- Should Botfield simulation run automatically on app start or only after user activation?
-- Should Background colour and image settings coexist or be mutually exclusive?
+### Panel Structure (Top to Bottom)
+1. **Layer Tabs [FIXED]** - Select which layer to work on
+   - [●BKGD] [VECFD] [BOTFD]
+   - Selected layer highlighted in neon green
 
-Closed decisions:
-- The application menu will not be integrated into the native title bar.
-- The window will keep the standard native minimize, maximize, and close controls.
+2. **Tool Ribbon [FIXED]** - Icon-based tool selection
+   - Visibility icon (☑/☐) always first
+   - Tool selection icons follow
+   - Selected tool highlighted in green
+   - Inactive tools in gray
+
+3. **Settings Panel [SCROLLABLE]** - Dynamic content
+   - Updates based on selected tool
+   - Always includes: Transparency slider
+   - Tool-specific controls below
+   - Scrolls vertically if content exceeds height
+
+### Color & Style
+- Background: Dark gray (#2E2E2E)
+- Text: Off-white (#E8E8E8)
+- Selected/Active: Neon green (#00FF00)
+- Hover: Cyan (#00FFD1)
+- Panel width: 230px default (200px minimum)
+- All controls: 44px minimum height for WCAG compliance
+
+### Interaction Model
+- **Visibility toggle**: Separate from tool selection - doesn't change tool
+- **Tool selection**: Click icon to switch tools - settings update instantly
+- **Transparency**: Part of tool settings - each tool has own transparency value
+- **Scrolling**: Smooth vertical scroll only, no horizontal scroll
+
+### Architecture Principles
+- Tool-centric design: Everything organized around available tools for each layer
+- Settings-as-content: No collapsible/expandable groups - just clean settings
+- Independence: Layer visibility is separate from tool selection
+- Speed: All interactions are instant (no delays or animations)
+
+--------------------------------------------------
+
+## 8. Recommended First Implementation Order
+
+1. **Architecture Refactor** (Current branch: feature/sidepanel-ux-exploration)
+   - Restructure ToolPanel to support 3-level hierarchy
+   - Create layer tab switching system
+   - Create tool ribbon system with visibility icon
+   - Implement dynamic settings panel
+
+2. **Background Layer (BKGD)**
+   - Implement Color tool
+   - Implement Image tool
+   - Implement Clear tool
+   - Wire all settings to canvas rendering
+
+3. **Vector Field Layer (VECFD)**
+   - Implement Paint tool (primary drawing tool)
+   - Implement Erase, Overlay, Clean, Random tools
+   - Implement Reset tool
+   - Wire falloff types, size, hardness, strength to field operations
+
+4. **Bot Field Layer (BOTFD)**
+   - Implement Place tool (manual bot placement)
+   - Implement Random tool (random spawning)
+   - Implement Auto tool (continuous spawn)
+   - Implement Clear and Export tools
+   - Wire all bot simulation parameters
+
+5. **Polish & Testing**
+   - Test all tool transitions
+   - Verify visibility toggle independence
+   - Test transparency settings per tool
+   - Keyboard navigation support
+   - Responsive sizing (narrow to wide panels)
+
+--------------------------------------------------
+
+## 9. Open Design Decisions
+
+- **Keyboard shortcuts**: Should each tool have a hotkey (e.g., 'P' for Paint)?
+- **Persistence**: Should transparency values per tool persist across sessions?
+- **Undo/Redo**: Should tool settings changes be undoable?
+- **Favorites**: Should users be able to save/recall tool presets?
+- **Reset Button**: Should there be a "Reset All Settings" for current layer?
+
+### Closed Decisions (Phase 2 UI Exploration)
+- ✓ Tool-centric architecture (icon ribbons, not collapsible trees)
+- ✓ Visibility as first icon in ribbon (not separate)
+- ✓ Transparency in settings per tool (not per layer)
+- ✓ No expanding/collapsing groups (all settings visible or scrollable)
+- ✓ Layer tabs + tool icons + settings (3-level hierarchy)
+- ✓ The application menu will not be integrated into the native title bar
+- ✓ The window will keep the standard native minimize, maximize, and close controls
 
 --------------------------------------------------
 

@@ -1,65 +1,43 @@
 package ui;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
-import javax.swing.plaf.basic.BasicTabbedPaneUI;
-import javax.swing.plaf.basic.BasicSliderUI;
-import javax.swing.plaf.basic.BasicButtonUI;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.KeyEvent;
-import java.awt.geom.RoundRectangle2D;
+import java.awt.event.*;
 
 /**
- * ToolPanel
- * Left-side vertical tabbed tool panel.
- * Four tabs: Background | Vector Field | Sketch | Botfield
- * Replaces the old horizontal UIPanel strip.
+ * ToolPanel - Phase 1 Refactor: Tool-Centric Architecture (Java 11 Compatible)
+ *
+ * NEW STRUCTURE (3-Level Hierarchy):
+ * ─────────────────────────────────
+ * 1. Layer Tabs [FIXED]        - Select layer (BKGD, VECFD, BOTFD)
+ * 2. Tool Ribbon [FIXED]       - Icon buttons: [☑ Visibility] [Tool] [Tool] ...
+ * 3. Settings Panel [SCROLLABLE] - Dynamic content per selected tool
  */
 
 public class ToolPanel extends JPanel {
 
+  // ── Constants ────────────────────────────────────────────────────────
   private static final int PANEL_WIDTH = 230;
-  private static final int PANEL_MIN_WIDTH = 200;  // Minimum width for responsive design
-  private static final int SECTION_PADDING = 8;    // Padding inside sections
-  private static final int CONTROL_SPACING = 4;    // Spacing between controls
-  private static final int BUTTON_HEIGHT = 44;     // WCAG minimum touch target height
-  private static final float CONTROL_WIDTH_RATIO = 0.92f;  // Controls use 92% of available width
+  private static final int PANEL_MIN_WIDTH = 200;
+  private static final int SECTION_PADDING = 8;
+  private static final int CONTROL_SPACING = 4;
+  private static final int BUTTON_HEIGHT = 44;
 
-  // ── Color Palette ──────────────────────────────────────────────────────
+  // ── Simplified Color Palette ─────────────────────────────────────────
   private static final Color COLOR_PANEL_BG = new Color(46, 46, 46);
-  // Main background for panels and tabs. Unified dark background.
-
-  // Removed COLOR_SECTION_BG - now unified with PANEL_BG for simplicity
-
-  // Removed COLOR_SECTION_BORDER - spacing replaces borders for cleaner design
-
   private static final Color COLOR_TEXT_PRIMARY = new Color(232, 232, 232);
-  // Primary text color. Off-white for all labels, buttons, and headers.
-
   private static final Color COLOR_TEXT_SECONDARY = new Color(176, 176, 176);
-  // Secondary text color for muted labels and hints. Rarely used.
-
-  private static final Color COLOR_TEXT_TAB = new Color(232, 232, 232);
-  // Tab text color. Off-white for tab labels.
-
   private static final Color COLOR_ACCENT_GREEN = new Color(0, 255, 0);
-  // Primary accent color. Neon green for active controls, interactive elements, and radar aesthetic.
-
   private static final Color COLOR_BUTTON_DEFAULT = new Color(0, 180, 0);
-  // Default button color. Muted green for rest state.
-
   private static final Color COLOR_BUTTON_HOVER = new Color(0, 255, 0);
-  // Button hover glow. Bright neon green when hovering over buttons.
 
-  private static final Color COLOR_ACCENT_CYAN = new Color(0, 255, 209);
-  // Secondary accent color. Cyan for hover states, secondary highlights, and alternative selections.
+  // ── Layer Definitions ────────────────────────────────────────────────
+  private static final int LAYER_BKGD = 0;
+  private static final int LAYER_VECFD = 1;
+  private static final int LAYER_BOTFD = 2;
+  private static final String[] LAYER_NAMES = {"BKGD", "VECFD", "BOTFD"};
 
-  // ── Listener interface ────────────────────────────────────────────────
-  // All methods have default no-op implementations so implementors only
-  // override the callbacks they care about, and new callbacks never break
-  // existing code.
+  // ── Listener Interface (Preserved from original) ──────────────────────
   public interface ToolListener {
     // Background
     default void onBackgroundToggle(boolean show) {}
@@ -71,14 +49,14 @@ public class ToolPanel extends JPanel {
     // Vector Field
     default void onVectorFieldToggle(boolean show) {}
     default void onVectorFieldTransparencyChanged(float alpha) {}
-    default void onVisualizationModeChanged(String mode) {}   // "arrow" | "heatmap"
+    default void onVisualizationModeChanged(String mode) {}
     default void onResetVectorField() {}
     default void onRandomVectorField() {}
 
     // Sketch
     default void onSketchToggle(boolean show) {}
     default void onSketchTransparencyChanged(float alpha) {}
-    default void onBrushModeChanged(boolean isBrush) {}      // true = brush, false = eraser
+    default void onBrushModeChanged(boolean isBrush) {}
     default void onBrushSizeChanged(float size) {}
     default void onBrushHardnessChanged(float hardness) {}
     default void onBrushStrengthChanged(float strength) {}
@@ -111,80 +89,756 @@ public class ToolPanel extends JPanel {
     default void onCenterSampleWeightChanged(float weight) {}
   }
 
+  // ── State ────────────────────────────────────────────────────────────
   private final ToolListener listener;
-  private JLabel brushSizeLabel, brushHardnessLabel, brushStrengthLabel;
-  private JLabel botLifeLabel, botRadarLabel, botSpeedLabel, botNumberLabel;
-  private JLabel botCountLabel;  // Live bot counter in UI
-  private JButton simToggleBtn;  // Play/Pause toggle button
+  private int currentLayer = LAYER_BKGD;
+  private String currentToolId = null;
+  private final boolean[] layerVisibility = {true, true, true};
+
+  // UI Components
+  private JPanel layerTabsPanel;
+  private JPanel toolRibbonPanel;
+  private JPanel settingsPanelContainer;
+  private JScrollPane settingsScroll;
+  private JButton[] layerButtons = new JButton[3];
+
+  // Public API
+  public JLabel botCountLabel;
+  public JButton simToggleBtn;
 
   public ToolPanel(ToolListener listener) {
     this.listener = listener;
-    setLayout(new BorderLayout(0, 0));  // No gaps between components
-    // Set preferred and minimum sizes for responsive layout
-    // Preferred: 230px, Minimum: 200px, Maximum: flexible based on parent
+    setLayout(new BorderLayout(0, 0));
     setPreferredSize(new Dimension(PANEL_WIDTH, 0));
     setMinimumSize(new Dimension(PANEL_MIN_WIDTH, 0));
     setBackground(COLOR_PANEL_BG);
-    setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));  // No padding around edges
+    setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
-    // Configure UI defaults for all components once (performance optimization)
-    configureUIDefaults();
+    buildLayerTabs();
+    buildToolRibbon();
+    buildSettingsPanel();
 
-    JTabbedPane tabs = new JTabbedPane(JTabbedPane.TOP);
-    tabs.setTabLayoutPolicy(JTabbedPane.WRAP_TAB_LAYOUT);  // Wrap to multiple rows if needed, don't use scroll buttons
-    tabs.setBackground(COLOR_PANEL_BG);
-    tabs.setForeground(COLOR_TEXT_TAB);
-    tabs.setBorder(BorderFactory.createEmptyBorder());  // Remove border to maximize space
-    
-    // Ensure tabs fill available space
-    tabs.setMinimumSize(new Dimension(PANEL_MIN_WIDTH, 0));
-    tabs.setPreferredSize(new Dimension(PANEL_WIDTH, 0));
-    
-    // Apply custom rounded tab UI (do NOT call updateUI() after setUI())
-    tabs.setUI(new RoundedTabbedPaneUI());
+    // Create wrapper for NORTH section (layer tabs + tool ribbon)
+    JPanel northWrapper = new JPanel();
+    northWrapper.setLayout(new BoxLayout(northWrapper, BoxLayout.Y_AXIS));
+    northWrapper.setBackground(COLOR_PANEL_BG);
+    northWrapper.add(layerTabsPanel);
+    northWrapper.add(toolRibbonPanel);
 
-    tabs.addTab("BG",     wrapScroll(buildBackgroundTab()));
-    tabs.addTab("Field",  wrapScroll(buildVectorFieldTab()));
-    tabs.addTab("Sketch", wrapScroll(buildSketchTab()));
-    tabs.addTab("Bots",   wrapScroll(buildBotfieldTab()));
+    add(northWrapper, BorderLayout.NORTH);
+    add(settingsScroll, BorderLayout.CENTER);
 
-    // Full tab tooltips
-    tabs.setToolTipTextAt(0, "Background");
-    tabs.setToolTipTextAt(1, "Vector Field");
-    tabs.setToolTipTextAt(2, "Sketch");
-    tabs.setToolTipTextAt(3, "Botfield");
-
-    add(tabs, BorderLayout.CENTER);
-    
-    // Register keyboard shortcuts for tab navigation (Ctrl+1-4)
-    registerKeyboardShortcuts(tabs);
+    switchToTool(LAYER_BKGD, "color");
   }
-  
-  /**
-   * Update the Play/Pause toggle button text and tooltip based on simulation state.
-   * Call from the render loop or after toggling.
-   * @param running true if simulation is currently running
-   */
+
+  // ────────────────────────────────────────────────────────────────────
+  // Level 1: Layer Tabs
+  // ────────────────────────────────────────────────────────────────────
+
+  private void buildLayerTabs() {
+    layerTabsPanel = new JPanel();
+    layerTabsPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 2, 0));
+    layerTabsPanel.setBackground(COLOR_PANEL_BG);
+    layerTabsPanel.setPreferredSize(new Dimension(PANEL_WIDTH, 40));
+    layerTabsPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+
+    for (int i = 0; i < LAYER_NAMES.length; i++) {
+      final int layerIndex = i;
+      JButton layerBtn = new JButton(LAYER_NAMES[i]);
+      layerBtn.setFont(new Font("Arial", Font.BOLD, 10));
+      layerBtn.setPreferredSize(new Dimension(68, 32));
+      layerBtn.setBackground(i == 0 ? COLOR_ACCENT_GREEN : COLOR_BUTTON_DEFAULT);
+      layerBtn.setForeground(COLOR_PANEL_BG);
+      layerBtn.setFocusPainted(false);
+      layerBtn.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+      layerBtn.setOpaque(true);
+
+      layerBtn.addActionListener(e -> switchLayer(layerIndex));
+      layerBtn.addMouseListener(makeHoverListener(layerBtn));
+      layerButtons[i] = layerBtn;
+      layerTabsPanel.add(layerBtn);
+    }
+  }
+
+  private void switchLayer(int layer) {
+    currentLayer = layer;
+    updateLayerTabsDisplay();
+    rebuildToolRibbon();
+    switchToTool(layer, getDefaultToolForLayer(layer));
+  }
+
+  private void updateLayerTabsDisplay() {
+    for (int i = 0; i < layerButtons.length; i++) {
+      if (i == currentLayer) {
+        layerButtons[i].setBackground(COLOR_ACCENT_GREEN);
+      } else {
+        layerButtons[i].setBackground(COLOR_BUTTON_DEFAULT);
+      }
+    }
+    layerTabsPanel.repaint();
+  }
+
+  private String getDefaultToolForLayer(int layer) {
+    if (layer == LAYER_BKGD) return "color";
+    if (layer == LAYER_VECFD) return "paint";
+    if (layer == LAYER_BOTFD) return "place";
+    return "color";
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Level 2: Tool Ribbon
+  // ────────────────────────────────────────────────────────────────────
+
+  private void buildToolRibbon() {
+    toolRibbonPanel = new JPanel();
+    toolRibbonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 4, 4));
+    toolRibbonPanel.setBackground(COLOR_PANEL_BG);
+    toolRibbonPanel.setPreferredSize(new Dimension(PANEL_WIDTH, 50));
+    toolRibbonPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+  }
+
+  private void rebuildToolRibbon() {
+    toolRibbonPanel.removeAll();
+
+    // Visibility icon
+    boolean isVisible = layerVisibility[currentLayer];
+    JButton visibilityBtn = new JButton(isVisible ? "☑" : "☐");
+    visibilityBtn.setFont(new Font("Arial", Font.BOLD, 14));
+    visibilityBtn.setPreferredSize(new Dimension(36, 36));
+    visibilityBtn.setBackground(isVisible ? COLOR_ACCENT_GREEN : COLOR_BUTTON_DEFAULT);
+    visibilityBtn.setForeground(COLOR_PANEL_BG);
+    visibilityBtn.setFocusPainted(false);
+    visibilityBtn.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+    visibilityBtn.setOpaque(true);
+    visibilityBtn.addMouseListener(makeHoverListener(visibilityBtn));
+    visibilityBtn.setToolTipText(isVisible ? "Hide layer" : "Show layer");
+    visibilityBtn.addActionListener(e -> toggleLayerVisibility());
+    toolRibbonPanel.add(visibilityBtn);
+
+    // Tool icons
+    String[] tools = getToolsForLayer(currentLayer);
+    for (String toolId : tools) {
+      JButton toolBtn = new JButton(getToolIcon(toolId));
+      toolBtn.setFont(new Font("Arial", Font.BOLD, 12));
+      toolBtn.setPreferredSize(new Dimension(36, 36));
+      boolean isSelected = toolId.equals(currentToolId);
+      toolBtn.setBackground(isSelected ? COLOR_ACCENT_GREEN : COLOR_BUTTON_DEFAULT);
+      toolBtn.setForeground(COLOR_PANEL_BG);
+      toolBtn.setFocusPainted(false);
+      toolBtn.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+      toolBtn.setOpaque(true);
+      toolBtn.addMouseListener(makeHoverListener(toolBtn));
+      toolBtn.setToolTipText(getToolName(toolId));
+      final String fToolId = toolId;
+      toolBtn.addActionListener(e -> switchToTool(currentLayer, fToolId));
+      toolRibbonPanel.add(toolBtn);
+    }
+
+    toolRibbonPanel.revalidate();
+    toolRibbonPanel.repaint();
+  }
+
+  private String[] getToolsForLayer(int layer) {
+    if (layer == LAYER_BKGD) return new String[]{"color", "image", "clear"};
+    if (layer == LAYER_VECFD) return new String[]{"paint", "erase", "overlay", "clean", "random", "reset"};
+    if (layer == LAYER_BOTFD) return new String[]{"place", "random", "auto", "clear", "export"};
+    return new String[]{};
+  }
+
+  private String getToolIcon(String toolId) {
+    if ("color".equals(toolId)) return "●";
+    if ("image".equals(toolId)) return "⬜";
+    if ("clear".equals(toolId)) return "✕";
+    if ("paint".equals(toolId)) return "🖌";
+    if ("erase".equals(toolId)) return "🗑";
+    if ("overlay".equals(toolId)) return "🪣";
+    if ("clean".equals(toolId)) return "🧹";
+    if ("random".equals(toolId)) return "🎲";
+    if ("reset".equals(toolId)) return "🔄";
+    if ("place".equals(toolId)) return "📍";
+    if ("auto".equals(toolId)) return "▶";
+    if ("export".equals(toolId)) return "📤";
+    return "?";
+  }
+
+  private String getToolName(String toolId) {
+    if ("color".equals(toolId)) return "Color";
+    if ("image".equals(toolId)) return "Image";
+    if ("clear".equals(toolId)) return "Clear";
+    if ("paint".equals(toolId)) return "Paint";
+    if ("erase".equals(toolId)) return "Erase";
+    if ("overlay".equals(toolId)) return "Overlay";
+    if ("clean".equals(toolId)) return "Clean";
+    if ("random".equals(toolId)) return "Random";
+    if ("reset".equals(toolId)) return "Reset";
+    if ("place".equals(toolId)) return "Place";
+    if ("auto".equals(toolId)) return "Auto";
+    if ("export".equals(toolId)) return "Export";
+    return toolId;
+  }
+
+  private void toggleLayerVisibility() {
+    layerVisibility[currentLayer] = !layerVisibility[currentLayer];
+
+    if (currentLayer == LAYER_BKGD) {
+      if (listener != null) listener.onBackgroundToggle(layerVisibility[currentLayer]);
+    } else if (currentLayer == LAYER_VECFD) {
+      if (listener != null) listener.onVectorFieldToggle(layerVisibility[currentLayer]);
+    } else if (currentLayer == LAYER_BOTFD) {
+      if (listener != null) listener.onBotfieldToggle(layerVisibility[currentLayer]);
+    }
+
+    rebuildToolRibbon();
+  }
+
+  private void switchToTool(int layer, String toolId) {
+    currentLayer = layer;
+    currentToolId = toolId;
+    rebuildToolRibbon();
+    updateSettingsPanel();
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // Level 3: Settings Panel
+  // ────────────────────────────────────────────────────────────────────
+
+  private void buildSettingsPanel() {
+    settingsPanelContainer = new JPanel();
+    settingsPanelContainer.setLayout(new BoxLayout(settingsPanelContainer, BoxLayout.Y_AXIS));
+    settingsPanelContainer.setBackground(COLOR_PANEL_BG);
+
+    settingsScroll = new JScrollPane(settingsPanelContainer,
+      JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+      JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+    settingsScroll.setBorder(BorderFactory.createEmptyBorder());
+    settingsScroll.getVerticalScrollBar().setUnitIncrement(12);
+  }
+
+  private void updateSettingsPanel() {
+    settingsPanelContainer.removeAll();
+
+    // Transparency slider
+    final JLabel[] transparencyLabel = new JLabel[1];
+    transparencyLabel[0] = new JLabel("Transparency: 100%");
+    transparencyLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+    transparencyLabel[0].setFont(new Font("Arial", Font.BOLD, 10));
+    transparencyLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+    
+    JSlider transparencySlider = new JSlider(0, 100, 100);
+    transparencySlider.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+    transparencySlider.setBackground(COLOR_PANEL_BG);
+    transparencySlider.setForeground(COLOR_ACCENT_GREEN);
+    transparencySlider.addChangeListener(e -> {
+      transparencyLabel[0].setText(String.format("Transparency: %d%%", transparencySlider.getValue()));
+      onTransparencyChanged(transparencySlider.getValue() / 100.0f);
+    });
+    
+    settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+    settingsPanelContainer.add(transparencyLabel[0]);
+    settingsPanelContainer.add(transparencySlider);
+    settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+    buildToolSpecificSettings();
+
+    settingsPanelContainer.add(Box.createVerticalGlue());
+    settingsPanelContainer.revalidate();
+    settingsPanelContainer.repaint();
+  }
+
+  private void buildToolSpecificSettings() {
+    if (currentLayer == LAYER_BKGD) {
+      buildBackgroundToolSettings(currentToolId);
+    } else if (currentLayer == LAYER_VECFD) {
+      buildVectorFieldToolSettings(currentToolId);
+    } else if (currentLayer == LAYER_BOTFD) {
+      buildBotFieldToolSettings(currentToolId);
+    }
+  }
+
+  private void buildBackgroundToolSettings(String toolId) {
+    if ("color".equals(toolId)) {
+      JLabel header = new JLabel("Color Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton colorPickerBtn = createButton("Color Picker...", 140);
+      colorPickerBtn.addActionListener(e -> {
+        if (listener != null) listener.onBackgroundColorPicker();
+      });
+      settingsPanelContainer.add(colorPickerBtn);
+    } else if ("image".equals(toolId)) {
+      JLabel header = new JLabel("Image Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton loadBtn = createButton("Load Image...", 140);
+      loadBtn.addActionListener(e -> {
+        if (listener != null) listener.onLoadBackgroundImage();
+      });
+      settingsPanelContainer.add(loadBtn);
+    } else if ("clear".equals(toolId)) {
+      JLabel header = new JLabel("Clear Background");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton clearBtn = createButton("Clear Image", 140);
+      clearBtn.addActionListener(e -> {
+        if (listener != null) listener.onClearBackgroundImage();
+      });
+      settingsPanelContainer.add(clearBtn);
+    }
+  }
+
+  private void buildVectorFieldToolSettings(String toolId) {
+    if ("paint".equals(toolId)) {
+      JLabel header = new JLabel("Paint Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] sizeLabel = new JLabel[1];
+      sizeLabel[0] = new JLabel("Size: 30");
+      sizeLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      sizeLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider sizeSlider = createSlider(5, 200, 30);
+      sizeSlider.addChangeListener(e -> {
+        float v = sizeSlider.getValue();
+        sizeLabel[0].setText(String.format("Size: %.0f", v));
+        if (listener != null) listener.onBrushSizeChanged(v);
+      });
+      settingsPanelContainer.add(sizeLabel[0]);
+      settingsPanelContainer.add(sizeSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] hardnessLabel = new JLabel[1];
+      hardnessLabel[0] = new JLabel("Hardness: 0.50");
+      hardnessLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      hardnessLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider hardnessSlider = createSlider(0, 100, 50);
+      hardnessSlider.addChangeListener(e -> {
+        float v = hardnessSlider.getValue() / 100.0f;
+        hardnessLabel[0].setText(String.format("Hardness: %.2f", v));
+        if (listener != null) listener.onBrushHardnessChanged(v);
+      });
+      settingsPanelContainer.add(hardnessLabel[0]);
+      settingsPanelContainer.add(hardnessSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] strengthLabel = new JLabel[1];
+      strengthLabel[0] = new JLabel("Strength: 2.0");
+      strengthLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      strengthLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider strengthSlider = createSlider(1, 50, 20);
+      strengthSlider.addChangeListener(e -> {
+        float v = strengthSlider.getValue() / 10.0f;
+        strengthLabel[0].setText(String.format("Strength: %.1f", v));
+        if (listener != null) listener.onBrushStrengthChanged(v);
+      });
+      settingsPanelContainer.add(strengthLabel[0]);
+      settingsPanelContainer.add(strengthSlider);
+    } else if ("erase".equals(toolId)) {
+      JLabel header = new JLabel("Erase Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] sizeLabel = new JLabel[1];
+      sizeLabel[0] = new JLabel("Size: 30");
+      sizeLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      sizeLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider sizeSlider = createSlider(5, 200, 30);
+      sizeSlider.addChangeListener(e -> {
+        float v = sizeSlider.getValue();
+        sizeLabel[0].setText(String.format("Size: %.0f", v));
+        if (listener != null) listener.onBrushSizeChanged(v);
+      });
+      settingsPanelContainer.add(sizeLabel[0]);
+      settingsPanelContainer.add(sizeSlider);
+    } else if ("overlay".equals(toolId)) {
+      JLabel header = new JLabel("Overlay Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      // Falloff buttons
+      JLabel falloffLabel = new JLabel("Falloff:");
+      falloffLabel.setForeground(COLOR_TEXT_PRIMARY);
+      falloffLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(falloffLabel);
+      JPanel falloffPanel = new JPanel();
+      falloffPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 4, 0));
+      falloffPanel.setBackground(COLOR_PANEL_BG);
+      for (String falloff : new String[]{"Linear", "Gaussian", "Hard"}) {
+        JButton btn = createButton(falloff, 45);
+        falloffPanel.add(btn);
+      }
+      settingsPanelContainer.add(falloffPanel);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      // Size, Hardness, Strength
+      final JLabel[] sizeLabel = new JLabel[1];
+      sizeLabel[0] = new JLabel("Size: 30");
+      sizeLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      sizeLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider sizeSlider = createSlider(5, 200, 30);
+      sizeSlider.addChangeListener(e -> {
+        float v = sizeSlider.getValue();
+        sizeLabel[0].setText(String.format("Size: %.0f", v));
+        if (listener != null) listener.onBrushSizeChanged(v);
+      });
+      settingsPanelContainer.add(sizeLabel[0]);
+      settingsPanelContainer.add(sizeSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] hardnessLabel = new JLabel[1];
+      hardnessLabel[0] = new JLabel("Hardness: 0.50");
+      hardnessLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      hardnessLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider hardnessSlider = createSlider(0, 100, 50);
+      hardnessSlider.addChangeListener(e -> {
+        float v = hardnessSlider.getValue() / 100.0f;
+        hardnessLabel[0].setText(String.format("Hardness: %.2f", v));
+        if (listener != null) listener.onBrushHardnessChanged(v);
+      });
+      settingsPanelContainer.add(hardnessLabel[0]);
+      settingsPanelContainer.add(hardnessSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] strengthLabel = new JLabel[1];
+      strengthLabel[0] = new JLabel("Strength: 2.0");
+      strengthLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      strengthLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider strengthSlider = createSlider(1, 50, 20);
+      strengthSlider.addChangeListener(e -> {
+        float v = strengthSlider.getValue() / 10.0f;
+        strengthLabel[0].setText(String.format("Strength: %.1f", v));
+        if (listener != null) listener.onBrushStrengthChanged(v);
+      });
+      settingsPanelContainer.add(strengthLabel[0]);
+      settingsPanelContainer.add(strengthSlider);
+    } else if ("clean".equals(toolId)) {
+      JLabel header = new JLabel("Clean Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      // Falloff buttons
+      JLabel falloffLabel = new JLabel("Falloff:");
+      falloffLabel.setForeground(COLOR_TEXT_PRIMARY);
+      falloffLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(falloffLabel);
+      JPanel falloffPanel = new JPanel();
+      falloffPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 4, 0));
+      falloffPanel.setBackground(COLOR_PANEL_BG);
+      for (String falloff : new String[]{"Linear", "Gaussian", "Hard"}) {
+        JButton btn = createButton(falloff, 45);
+        falloffPanel.add(btn);
+      }
+      settingsPanelContainer.add(falloffPanel);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      // Size, Hardness, Strength
+      final JLabel[] sizeLabel = new JLabel[1];
+      sizeLabel[0] = new JLabel("Size: 30");
+      sizeLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      sizeLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider sizeSlider = createSlider(5, 200, 30);
+      sizeSlider.addChangeListener(e -> {
+        float v = sizeSlider.getValue();
+        sizeLabel[0].setText(String.format("Size: %.0f", v));
+        if (listener != null) listener.onBrushSizeChanged(v);
+      });
+      settingsPanelContainer.add(sizeLabel[0]);
+      settingsPanelContainer.add(sizeSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] hardnessLabel = new JLabel[1];
+      hardnessLabel[0] = new JLabel("Hardness: 0.50");
+      hardnessLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      hardnessLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider hardnessSlider = createSlider(0, 100, 50);
+      hardnessSlider.addChangeListener(e -> {
+        float v = hardnessSlider.getValue() / 100.0f;
+        hardnessLabel[0].setText(String.format("Hardness: %.2f", v));
+        if (listener != null) listener.onBrushHardnessChanged(v);
+      });
+      settingsPanelContainer.add(hardnessLabel[0]);
+      settingsPanelContainer.add(hardnessSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] strengthLabel = new JLabel[1];
+      strengthLabel[0] = new JLabel("Strength: 2.0");
+      strengthLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      strengthLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider strengthSlider = createSlider(1, 50, 20);
+      strengthSlider.addChangeListener(e -> {
+        float v = strengthSlider.getValue() / 10.0f;
+        strengthLabel[0].setText(String.format("Strength: %.1f", v));
+        if (listener != null) listener.onBrushStrengthChanged(v);
+      });
+      settingsPanelContainer.add(strengthLabel[0]);
+      settingsPanelContainer.add(strengthSlider);
+    } else if ("random".equals(toolId)) {
+      JLabel header = new JLabel("Random Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      // Falloff buttons
+      JLabel falloffLabel = new JLabel("Falloff:");
+      falloffLabel.setForeground(COLOR_TEXT_PRIMARY);
+      falloffLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(falloffLabel);
+      JPanel falloffPanel = new JPanel();
+      falloffPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 4, 0));
+      falloffPanel.setBackground(COLOR_PANEL_BG);
+      for (String falloff : new String[]{"Linear", "Gaussian", "Hard"}) {
+        JButton btn = createButton(falloff, 45);
+        falloffPanel.add(btn);
+      }
+      settingsPanelContainer.add(falloffPanel);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      // Size, Hardness, Strength
+      final JLabel[] sizeLabel = new JLabel[1];
+      sizeLabel[0] = new JLabel("Size: 30");
+      sizeLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      sizeLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider sizeSlider = createSlider(5, 200, 30);
+      sizeSlider.addChangeListener(e -> {
+        float v = sizeSlider.getValue();
+        sizeLabel[0].setText(String.format("Size: %.0f", v));
+        if (listener != null) listener.onBrushSizeChanged(v);
+      });
+      settingsPanelContainer.add(sizeLabel[0]);
+      settingsPanelContainer.add(sizeSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] hardnessLabel = new JLabel[1];
+      hardnessLabel[0] = new JLabel("Hardness: 0.50");
+      hardnessLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      hardnessLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider hardnessSlider = createSlider(0, 100, 50);
+      hardnessSlider.addChangeListener(e -> {
+        float v = hardnessSlider.getValue() / 100.0f;
+        hardnessLabel[0].setText(String.format("Hardness: %.2f", v));
+        if (listener != null) listener.onBrushHardnessChanged(v);
+      });
+      settingsPanelContainer.add(hardnessLabel[0]);
+      settingsPanelContainer.add(hardnessSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] strengthLabel = new JLabel[1];
+      strengthLabel[0] = new JLabel("Strength: 2.0");
+      strengthLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      strengthLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider strengthSlider = createSlider(1, 50, 20);
+      strengthSlider.addChangeListener(e -> {
+        float v = strengthSlider.getValue() / 10.0f;
+        strengthLabel[0].setText(String.format("Strength: %.1f", v));
+        if (listener != null) listener.onBrushStrengthChanged(v);
+      });
+      settingsPanelContainer.add(strengthLabel[0]);
+      settingsPanelContainer.add(strengthSlider);
+    } else if ("reset".equals(toolId)) {
+      JLabel header = new JLabel("Reset Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton actionBtn = createButton("Reset Field", 140);
+      actionBtn.addActionListener(e -> {
+        if (listener != null) listener.onResetVectorField();
+      });
+      settingsPanelContainer.add(actionBtn);
+    }
+  }
+
+  private void buildBotFieldToolSettings(String toolId) {
+    if ("place".equals(toolId)) {
+      JLabel header = new JLabel("Place Bot Tool");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton placeBtn = createButton("Place One Bot", 140);
+      placeBtn.addActionListener(e -> {
+        if (listener != null) listener.onSpawnBot();
+      });
+      settingsPanelContainer.add(placeBtn);
+    } else if ("random".equals(toolId)) {
+      JLabel header = new JLabel("Randomize Bots");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      final JLabel[] numLabel = new JLabel[1];
+      numLabel[0] = new JLabel("Count: 5");
+      numLabel[0].setForeground(COLOR_TEXT_PRIMARY);
+      numLabel[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+      JSlider numSlider = createSlider(1, 100, 5);
+      numSlider.addChangeListener(e -> {
+        numLabel[0].setText("Count: " + numSlider.getValue());
+        if (listener != null) listener.onBotNumberChanged(numSlider.getValue());
+      });
+      settingsPanelContainer.add(numLabel[0]);
+      settingsPanelContainer.add(numSlider);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton randomBtn = createButton("Spawn Random", 140);
+      randomBtn.addActionListener(e -> {
+        if (listener != null) listener.onAutoSpawnToggle(true);
+      });
+      settingsPanelContainer.add(randomBtn);
+    } else if ("auto".equals(toolId)) {
+      JLabel header = new JLabel("Auto Spawn");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      simToggleBtn = createButton("▶ Start", 140);
+      simToggleBtn.addActionListener(e -> {
+        if (listener != null) listener.onSimulationToggle();
+      });
+      settingsPanelContainer.add(simToggleBtn);
+
+      botCountLabel = new JLabel("Active: 0  |  Traces: 0");
+      botCountLabel.setForeground(COLOR_TEXT_SECONDARY);
+      botCountLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+      botCountLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+      settingsPanelContainer.add(botCountLabel);
+    } else if ("clear".equals(toolId)) {
+      JLabel header = new JLabel("Clear Control");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton clearBotsBtn = createButton("Clear Bots", 140);
+      clearBotsBtn.addActionListener(e -> {
+        if (listener != null) listener.onClearBots();
+      });
+      settingsPanelContainer.add(clearBotsBtn);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton clearTracesBtn = createButton("Clear Traces", 140);
+      clearTracesBtn.addActionListener(e -> {
+        if (listener != null) listener.onClearTraces();
+      });
+      settingsPanelContainer.add(clearTracesBtn);
+    } else if ("export".equals(toolId)) {
+      JLabel header = new JLabel("Export Data");
+      header.setForeground(COLOR_TEXT_PRIMARY);
+      header.setFont(new Font("Arial", Font.BOLD, 12));
+      header.setAlignmentX(Component.LEFT_ALIGNMENT);
+      settingsPanelContainer.add(header);
+      settingsPanelContainer.add(Box.createRigidArea(new Dimension(0, 8)));
+
+      JButton exportBtn = createButton("Export State", 140);
+      settingsPanelContainer.add(exportBtn);
+    }
+  }
+
+  private void onTransparencyChanged(float alpha) {
+    if (currentLayer == LAYER_BKGD) {
+      if (listener != null) listener.onBackgroundTransparencyChanged(alpha);
+    } else if (currentLayer == LAYER_VECFD) {
+      if (listener != null) listener.onVectorFieldTransparencyChanged(alpha);
+    } else if (currentLayer == LAYER_BOTFD) {
+      if (listener != null) listener.onBotfieldTransparencyChanged(alpha);
+    }
+  }
+
+  private JButton createButton(String text, int width) {
+    JButton btn = new JButton(text);
+    btn.setMaximumSize(new Dimension(width, 36));
+    btn.setBackground(COLOR_BUTTON_DEFAULT);
+    btn.setForeground(COLOR_PANEL_BG);
+    btn.setFocusPainted(false);
+    btn.setFont(new Font("Arial", Font.BOLD, 11));
+    btn.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+    btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+    btn.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseEntered(MouseEvent e) {
+        btn.setBackground(COLOR_BUTTON_HOVER);
+      }
+
+      @Override
+      public void mouseExited(MouseEvent e) {
+        btn.setBackground(COLOR_BUTTON_DEFAULT);
+      }
+    });
+    return btn;
+  }
+
+  private JSlider createSlider(int min, int max, int value) {
+    JSlider slider = new JSlider(min, max, value);
+    slider.setMaximumSize(new Dimension(190, 28));
+    slider.setBackground(COLOR_PANEL_BG);
+    slider.setForeground(COLOR_ACCENT_GREEN);
+    slider.setAlignmentX(Component.LEFT_ALIGNMENT);
+    slider.setFocusable(false);
+    return slider;
+  }
+
+  private MouseAdapter makeHoverListener(JButton btn) {
+    return new MouseAdapter() {
+      private final Color originalBg = btn.getBackground();
+
+      @Override
+      public void mouseEntered(MouseEvent e) {
+        btn.setBackground(COLOR_BUTTON_HOVER);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+      }
+
+      @Override
+      public void mouseExited(MouseEvent e) {
+        btn.setBackground(originalBg);
+        btn.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+      }
+    };
+  }
+
   public void updateSimulationState(boolean running) {
     if (simToggleBtn != null) {
       SwingUtilities.invokeLater(() -> {
-        if (running) {
-          simToggleBtn.setText("\u23F8 Pause");
-          simToggleBtn.setToolTipText("Pause the bot simulation");
-        } else {
-          simToggleBtn.setText("\u25B6 Play");
-          simToggleBtn.setToolTipText("Start the bot simulation");
-        }
+        simToggleBtn.setText(running ? "\u23F8 Pause" : "\u25B6 Play");
+        simToggleBtn.setToolTipText(running ? "Pause simulation" : "Start simulation");
       });
     }
   }
-  
-  /**
-   * Update the live bot counter label with current active and dead bot counts.
-   * Call from the render loop for real-time feedback.
-   * @param active Number of currently alive bots
-   * @param dead Number of dead bots with preserved traces
-   */
+
   public void updateBotCount(int active, int dead) {
     if (botCountLabel != null) {
       SwingUtilities.invokeLater(() -> {
@@ -192,1373 +846,4 @@ public class ToolPanel extends JPanel {
       });
     }
   }
-
-  // ── Scroll wrapper ────────────────────────────────────────────────────
-  private JScrollPane wrapScroll(JPanel content) {
-    JScrollPane sp = new JScrollPane(content,
-      JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-      JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-    sp.setBorder(BorderFactory.createEmptyBorder());
-    sp.getVerticalScrollBar().setUnitIncrement(12);
-    return sp;
-  }
-  // ── Configure UI defaults for all components (performance optimization) ──
-  private void configureUIDefaults() {
-    // All UI styling is explicitly handled by custom UI classes:
-    // - RoundedTabbedPaneUI for tabs (overrides all TabbedPane rendering)
-    // - CustomSliderUI for sliders (overrides all Slider rendering)
-    // - CustomButtonUI for buttons (overrides all Button rendering)
-    // No UIManager defaults are needed since we control all painting
-  }
-
-  // ── Helper: Calculate responsive component width ──
-  private int getComponentWidth() {
-    int panelWidth = getWidth();
-    if (panelWidth <= 0) {
-      panelWidth = PANEL_WIDTH;  // Use default if width not yet set
-    }
-    return Math.max((int)(panelWidth * CONTROL_WIDTH_RATIO), PANEL_MIN_WIDTH - SECTION_PADDING * 2);
-  }
-
-  // ── Helper: Show confirmation dialog for destructive actions ──
-  private boolean confirmAction(String title, String message) {
-    int result = JOptionPane.showConfirmDialog(
-      this,
-      message,
-      title,
-      JOptionPane.YES_NO_OPTION,
-      JOptionPane.WARNING_MESSAGE
-    );
-    return result == JOptionPane.YES_OPTION;
-  }
-
-  // ── Helper: Show status feedback message (brief toast-like message) ──
-  private void showStatus(String message) {
-    // Create a temporary status popup
-    JLabel statusLabel = new JLabel(message);
-    statusLabel.setFont(new Font("Arial", Font.BOLD, 11));
-    statusLabel.setForeground(COLOR_ACCENT_GREEN);
-    statusLabel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
-    
-    // Show in a popup that auto-closes after 2 seconds
-    JWindow popup = new JWindow();
-    popup.setContentPane(statusLabel);
-    popup.setBackground(new Color(46, 46, 46, 240));
-    popup.setAlwaysOnTop(true);
-    popup.pack();
-    
-    // Position near the tool panel
-    Component parent = SwingUtilities.getWindowAncestor(this);
-    if (parent != null) {
-      popup.setLocation(parent.getX() + 30, parent.getY() + 100);
-    }
-    popup.setVisible(true);
-    
-    // Auto-close after 2 seconds
-    Timer timer = new Timer(2000, e -> popup.dispose());
-    timer.setRepeats(false);
-    timer.start();
-  }
-
-  // ── Helper: Show error feedback message (toast-like with warning styling) ──
-  private void showError(String message) {
-    // Create a temporary error popup
-    JLabel errorLabel = new JLabel(message);
-    errorLabel.setFont(new Font("Arial", Font.BOLD, 11));
-    errorLabel.setForeground(new Color(255, 100, 100));  // Light red
-    errorLabel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
-    
-    // Show in a popup that auto-closes after 3 seconds
-    JWindow popup = new JWindow();
-    popup.setContentPane(errorLabel);
-    popup.setBackground(new Color(80, 30, 30, 240));  // Dark red tint
-    popup.setAlwaysOnTop(true);
-    popup.pack();
-    
-    // Position near the tool panel
-    Component parent = SwingUtilities.getWindowAncestor(this);
-    if (parent != null) {
-      popup.setLocation(parent.getX() + 30, parent.getY() + 100);
-    }
-    popup.setVisible(true);
-    
-    // Auto-close after 3 seconds
-    Timer timer = new Timer(3000, e -> popup.dispose());
-    timer.setRepeats(false);
-    timer.start();
-  }
-
-  // ── Helper: Add hover effects to buttons ──
-  private void addButtonHoverEffect(JButton button) {
-    final Color normalBg = COLOR_BUTTON_DEFAULT;
-    final Color normalFg = COLOR_PANEL_BG;
-    final Color hoverBg = COLOR_BUTTON_HOVER;  // Glow green on hover
-    final Color pressBg = Color.WHITE;  // White on press
-
-    // Apply custom UI to prevent default L&F from overriding colors
-    button.setUI(new CustomButtonUI());
-    button.setFocusPainted(false);
-    button.setContentAreaFilled(true);
-    button.setOpaque(true);
-
-    button.addMouseListener(new MouseAdapter() {
-      @Override
-      public void mouseEntered(MouseEvent e) {
-        if ((e.getModifiersEx() & MouseEvent.BUTTON1_DOWN_MASK) == 0) {
-          // Only change to glow green if not currently pressed
-          button.setBackground(hoverBg);
-          button.setForeground(COLOR_PANEL_BG);  // Dark text on glow green
-        }
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-      }
-
-      @Override
-      public void mouseExited(MouseEvent e) {
-        // Return to normal when mouse exits
-        button.setBackground(normalBg);
-        button.setForeground(normalFg);
-        button.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-      }
-
-      @Override
-      public void mousePressed(MouseEvent e) {
-        button.setBackground(pressBg);
-        button.setForeground(Color.BLACK);  // Black text on white
-      }
-
-      @Override
-      public void mouseReleased(MouseEvent e) {
-        // Keep glow green until mouse exits
-        button.setBackground(hoverBg);
-        button.setForeground(COLOR_PANEL_BG);
-      }
-    });
-  }
-
-  // ── Helper: Add hover effects to sliders ──
-  private void addSliderHoverEffect(JSlider slider) {
-    slider.addMouseListener(new MouseAdapter() {
-      @Override
-      public void mouseEntered(MouseEvent e) {
-        slider.setToolTipText(slider.getToolTipText() + " (Value: " + slider.getValue() + ")");
-        slider.setCursor(new Cursor(Cursor.HAND_CURSOR));
-      }
-
-      @Override
-      public void mouseExited(MouseEvent e) {
-        slider.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-      }
-    });
-  }
-
-  // ── Helper: Add hover effects to checkboxes ──
-  private void addCheckBoxHoverEffect(JCheckBox checkbox) {
-    checkbox.addMouseListener(new MouseAdapter() {
-      @Override
-      public void mouseEntered(MouseEvent e) {
-        checkbox.setCursor(new Cursor(Cursor.HAND_CURSOR));
-      }
-
-      @Override
-      public void mouseExited(MouseEvent e) {
-        checkbox.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-      }
-    });
-  }
-
-  // ── Helper: Add hover effects to radio buttons ──
-  private void addRadioButtonHoverEffect(JRadioButton radio) {
-    radio.addMouseListener(new MouseAdapter() {
-      @Override
-      public void mouseEntered(MouseEvent e) {
-        radio.setCursor(new Cursor(Cursor.HAND_CURSOR));
-      }
-
-      @Override
-      public void mouseExited(MouseEvent e) {
-        radio.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-      }
-    });
-  }
-
-  // ── Helper: Set button disabled state with visual styling ──
-  private void setButtonDisabled(JButton button, String reason) {
-    button.setEnabled(false);
-    button.setForeground(new Color(150, 150, 150));  // Grayed text
-    button.setBackground(new Color(60, 60, 60));    // Darker button background
-    button.setToolTipText(reason);
-    button.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-  }
-
-  // ── Helper: Set button enabled state ──
-  private void setButtonEnabled(JButton button) {
-    button.setEnabled(true);
-    button.setForeground(COLOR_PANEL_BG);
-    button.setBackground(COLOR_BUTTON_DEFAULT);
-  }
-
-  // ── Helper: Set slider disabled state with visual styling ──
-  private void setSliderDisabled(JSlider slider, String reason) {
-    slider.setEnabled(false);
-    slider.setForeground(new Color(100, 100, 100));  // Grayed green
-    slider.setToolTipText(reason);
-    slider.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-  }
-
-  // ── Helper: Set slider enabled state ──
-  private void setSliderEnabled(JSlider slider) {
-    slider.setEnabled(true);
-    slider.setForeground(COLOR_ACCENT_GREEN);
-  }
-
-  // ── Helper: Set checkbox disabled state with visual styling ──
-  private void setCheckBoxDisabled(JCheckBox checkbox, String reason) {
-    checkbox.setEnabled(false);
-    checkbox.setForeground(new Color(100, 100, 100));  // Grayed out
-    checkbox.setToolTipText(reason);
-    checkbox.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-  }
-
-  // ── Helper: Set checkbox enabled state ──
-  private void setCheckBoxEnabled(JCheckBox checkbox) {
-    checkbox.setEnabled(true);
-    checkbox.setForeground(COLOR_ACCENT_GREEN);
-  }
-
-  // ── Helper: Animate button press (no visual change needed, hover handles it) ──
-  private void animateButtonPress(JButton button) {
-    // Button already shows white on hover via addButtonHoverEffect
-    // No additional animation needed
-  }
-
-  // ── Helper: Animate tab switch with fade effect ──
-  private void animateTabSwitch(JTabbedPane tabs, int newTab) {
-    // Save current opacity
-    Component currentComponent = tabs.getSelectedComponent();
-    
-    // Fade out current tab
-    if (currentComponent != null) {
-      currentComponent.setVisible(false);
-    }
-    
-    // Switch tab
-    tabs.setSelectedIndex(newTab);
-    Component newComponent = tabs.getSelectedComponent();
-    
-    // Fade in new tab
-    if (newComponent != null) {
-      newComponent.setVisible(true);
-    }
-  }
-
-  // ── Helper: Show brief success flash animation ──
-  private void showSuccessFlash() {
-    // Create a brief bright flash by showing the status with special styling
-    JLabel flashLabel = new JLabel("✓");
-    flashLabel.setFont(new Font("Arial", Font.BOLD, 20));
-    flashLabel.setForeground(COLOR_ACCENT_GREEN);
-    flashLabel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
-    
-    JWindow flash = new JWindow();
-    flash.setContentPane(flashLabel);
-    flash.setBackground(new Color(46, 46, 46, 200));
-    flash.setAlwaysOnTop(true);
-    flash.pack();
-    
-    Component parent = SwingUtilities.getWindowAncestor(this);
-    if (parent != null) {
-      flash.setLocation(parent.getX() + 50, parent.getY() + 150);
-    }
-    flash.setVisible(true);
-    
-    // Auto-close after 500ms
-    Timer timer = new Timer(500, e -> flash.dispose());
-    timer.setRepeats(false);
-    timer.start();
-  }
-
-  // ── Helper: Add keyboard shortcuts for tab navigation ──
-  private void registerKeyboardShortcuts(JTabbedPane tabs) {
-    KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
-      if (e.getID() == KeyEvent.KEY_PRESSED && (e.isControlDown())) {
-        switch (e.getKeyCode()) {
-          case KeyEvent.VK_1:
-            tabs.setSelectedIndex(0);
-            e.consume();
-            return true;
-          case KeyEvent.VK_2:
-            tabs.setSelectedIndex(1);
-            e.consume();
-            return true;
-          case KeyEvent.VK_3:
-            tabs.setSelectedIndex(2);
-            e.consume();
-            return true;
-          case KeyEvent.VK_4:
-            tabs.setSelectedIndex(3);
-            e.consume();
-            return true;
-        }
-      }
-      return false;
-    });
-  }
-
-  // ── Helper: section separator label ──────────────────────────────────
-  private JPanel section(String title) {
-    JPanel panel = new JPanel();
-    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-    
-    // Section header - clean bold text, no borders or decorations
-    JLabel header = new JLabel(title);
-    header.setFont(new Font("Arial", Font.BOLD, 11));
-    header.setForeground(COLOR_TEXT_PRIMARY);
-    header.setAlignmentX(Component.LEFT_ALIGNMENT);
-    header.setBorder(BorderFactory.createEmptyBorder(SECTION_PADDING, 0, CONTROL_SPACING, 0));
-    panel.add(header);
-    
-    panel.setBackground(COLOR_PANEL_BG);
-    panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-    panel.setBorder(BorderFactory.createEmptyBorder(0, 0, CONTROL_SPACING, 0));
-    return panel;
-  }
-
-  private JLabel rowLabel(String text) {
-    JLabel l = new JLabel(text);
-    l.setForeground(COLOR_TEXT_PRIMARY);
-    l.setFont(new Font("Arial", Font.PLAIN, 11));
-    l.setAlignmentX(Component.LEFT_ALIGNMENT);
-    return l;
-  }
-
-  private JSlider rowSlider(int min, int max, int value) {
-    JSlider s = new JSlider(min, max, value);
-    int width = getComponentWidth();
-    s.setPreferredSize(new Dimension(width, 28));
-    s.setMaximumSize(new Dimension(width, 28));
-    s.setBackground(COLOR_PANEL_BG);
-    s.setForeground(COLOR_ACCENT_GREEN);
-    s.setAlignmentX(Component.LEFT_ALIGNMENT);
-    s.setFocusable(true);
-    
-    // Apply custom slider UI to this instance
-    s.setUI(new CustomSliderUI(s));
-    
-    // Add hover effect
-    addSliderHoverEffect(s);
-    
-    return s;
-  }
-
-  private JButton rowButton(String text) {
-    JButton b = new JButton(text);
-    int width = getComponentWidth();
-    b.setAlignmentX(Component.LEFT_ALIGNMENT);
-    b.setMaximumSize(new Dimension(width, BUTTON_HEIGHT));
-    b.setBackground(COLOR_BUTTON_DEFAULT);
-    b.setForeground(COLOR_PANEL_BG);
-    b.setFocusPainted(false);  // No Swing focus painting
-    b.setFont(new Font("Arial", Font.BOLD, 11));
-    b.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-    
-    // Add hover effect
-    addButtonHoverEffect(b);
-    
-    return b;
-  }
-
-  private JCheckBox rowCheckBox(String text, boolean selected) {
-    JCheckBox cb = new JCheckBox(text, selected);
-    cb.setBackground(COLOR_PANEL_BG);
-    cb.setForeground(COLOR_ACCENT_GREEN);
-    cb.setFont(new Font("Arial", Font.PLAIN, 11));
-    cb.setAlignmentX(Component.LEFT_ALIGNMENT);
-    cb.setFocusable(true);
-    cb.setFocusPainted(false);  // No Swing focus painting
-    
-    // Add hover effect
-    addCheckBoxHoverEffect(cb);
-    
-    return cb;
-  }
-
-  private void pad(JPanel p) {
-    p.add(Box.createRigidArea(new Dimension(0, CONTROL_SPACING)));
-  }
-
-  // ────────────────────────────────────────────────────────────────────
-  // TAB 1 — Background
-  // ────────────────────────────────────────────────────────────────────
-  private JPanel buildBackgroundTab() {
-    JPanel root = new JPanel();
-    root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(COLOR_PANEL_BG);
-    root.setBorder(BorderFactory.createEmptyBorder(SECTION_PADDING, SECTION_PADDING, SECTION_PADDING, SECTION_PADDING));
-
-    // Visibility
-    JPanel visSection = section("Visibility");
-    JCheckBox showBg = rowCheckBox("Show Background", true);
-    showBg.setToolTipText("Toggle whether the background is visible on the canvas (checked = visible)");
-    showBg.getAccessibleContext().setAccessibleName("Show Background");
-    showBg.getAccessibleContext().setAccessibleDescription("Toggle background visibility on canvas");
-    showBg.addActionListener(e -> { if (listener != null) listener.onBackgroundToggle(showBg.isSelected()); });
-    visSection.add(showBg);
-    root.add(visSection);
-    pad(root);
-
-    // Appearance
-    JPanel appearSection = section("Appearance");
-    JLabel alphaLabel = rowLabel("Transparency: 100%");
-    appearSection.add(alphaLabel);
-    JSlider alphaSlider = rowSlider(0, 100, 100);
-    alphaSlider.setToolTipText("Adjust background transparency from fully transparent (0%) to fully opaque (100%)");
-    alphaSlider.getAccessibleContext().setAccessibleName("Background Transparency");
-    alphaSlider.getAccessibleContext().setAccessibleDescription("Adjust background transparency from 0 to 100 percent");
-    alphaSlider.addChangeListener(e -> {
-      float alpha = alphaSlider.getValue() / 100.0f;
-      alphaLabel.setText(String.format("Transparency: %d%%", alphaSlider.getValue()));
-      if (listener != null) listener.onBackgroundTransparencyChanged(alpha);
-    });
-    appearSection.add(alphaSlider);
-    pad(appearSection);
-    JButton colorBtn = rowButton("Colour...");
-    colorBtn.setToolTipText("Click to open the color picker and choose a background color");
-    colorBtn.getAccessibleContext().setAccessibleName("Background Color Picker");
-    colorBtn.getAccessibleContext().setAccessibleDescription("Opens color picker to change background color");
-    colorBtn.addActionListener(e -> {
-      animateButtonPress(colorBtn);
-      if (listener != null) {
-        listener.onBackgroundColorPicker();
-      }
-    });
-    appearSection.add(colorBtn);
-    root.add(appearSection);
-    pad(root);
-
-    // Image
-    JPanel imgSection = section("Image");
-    JButton loadBtn = rowButton("Load Image...");
-    loadBtn.setToolTipText("Click to browse your computer and select an image file as the background (PNG, JPG, etc.)");
-    loadBtn.getAccessibleContext().setAccessibleName("Load Background Image");
-    loadBtn.getAccessibleContext().setAccessibleDescription("Opens file browser to load a background image");
-    loadBtn.addActionListener(e -> {
-      animateButtonPress(loadBtn);
-      if (listener != null) {
-        listener.onLoadBackgroundImage();
-      }
-    });
-    JButton clearImgBtn = rowButton("Clear Image");
-    clearImgBtn.setToolTipText("Remove the currently loaded background image from the canvas");
-    clearImgBtn.getAccessibleContext().setAccessibleName("Clear Background Image");
-    clearImgBtn.getAccessibleContext().setAccessibleDescription("Removes the currently loaded background image");
-    clearImgBtn.addActionListener(e -> {
-      animateButtonPress(clearImgBtn);
-      if (listener != null) {
-        listener.onClearBackgroundImage();
-      }
-    });
-    imgSection.add(loadBtn);
-    pad(imgSection);
-    imgSection.add(clearImgBtn);
-    root.add(imgSection);
-
-    root.add(Box.createVerticalGlue());
-    return root;
-  }
-
-  // ────────────────────────────────────────────────────────────────────
-  // TAB 2 — Vector Field
-  // ────────────────────────────────────────────────────────────────────
-  private JPanel buildVectorFieldTab() {
-    JPanel root = new JPanel();
-    root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(COLOR_PANEL_BG);
-    root.setBorder(BorderFactory.createEmptyBorder(SECTION_PADDING, SECTION_PADDING, SECTION_PADDING, SECTION_PADDING));
-
-    // Visibility
-    JPanel visSection = section("Visibility");
-    JCheckBox showField = rowCheckBox("Show Vector Field", true);
-    showField.setToolTipText("Toggle whether the vector field visualization is visible on the canvas");
-    showField.getAccessibleContext().setAccessibleName("Show Vector Field");
-    showField.getAccessibleContext().setAccessibleDescription("Toggle vector field visualization visibility");
-    showField.addActionListener(e -> { if (listener != null) listener.onVectorFieldToggle(showField.isSelected()); });
-    visSection.add(showField);
-    root.add(visSection);
-    pad(root);
-
-    // Appearance
-    JPanel appearSection = section("Appearance");
-    JLabel alphaLabel = rowLabel("Transparency: 100%");
-    appearSection.add(alphaLabel);
-    JSlider alphaSlider = rowSlider(0, 100, 100);
-    alphaSlider.setToolTipText("Control how transparent the vector field visualization appears (0% = invisible, 100% = opaque)");
-    alphaSlider.getAccessibleContext().setAccessibleName("Vector Field Transparency");
-    alphaSlider.getAccessibleContext().setAccessibleDescription("Adjust vector field transparency from 0 to 100 percent");
-    alphaSlider.addChangeListener(e -> {
-      alphaLabel.setText(String.format("Transparency: %d%%", alphaSlider.getValue()));
-      if (listener != null) listener.onVectorFieldTransparencyChanged(alphaSlider.getValue() / 100.0f);
-    });
-    appearSection.add(alphaSlider);
-    pad(appearSection);
-
-    JLabel modeLabel = rowLabel("Visualization Mode");
-    appearSection.add(modeLabel);
-    JRadioButton arrowBtn = new JRadioButton("Arrow");
-    arrowBtn.setToolTipText("Display vectors as arrows showing direction and magnitude");
-    arrowBtn.getAccessibleContext().setAccessibleName("Arrow Visualization Mode");
-    arrowBtn.getAccessibleContext().setAccessibleDescription("Display vector field as arrows");
-    JRadioButton heatmapBtn = new JRadioButton("Heatmap");
-    heatmapBtn.setToolTipText("Display vectors as color-coded heatmap showing magnitude intensity");
-    heatmapBtn.getAccessibleContext().setAccessibleName("Heatmap Visualization Mode");
-    heatmapBtn.getAccessibleContext().setAccessibleDescription("Display vector field as heatmap");
-    styleRadio(arrowBtn); styleRadio(heatmapBtn);
-    ButtonGroup modeGroup = new ButtonGroup();
-    modeGroup.add(arrowBtn); modeGroup.add(heatmapBtn);
-    arrowBtn.setSelected(true);
-    arrowBtn.addActionListener(e -> { if (listener != null) listener.onVisualizationModeChanged("arrow"); });
-    heatmapBtn.addActionListener(e -> { if (listener != null) listener.onVisualizationModeChanged("heatmap"); });
-    appearSection.add(arrowBtn);
-    appearSection.add(heatmapBtn);
-    root.add(appearSection);
-    pad(root);
-
-    // Actions
-    JPanel actSection = section("Actions");
-    JButton resetBtn = rowButton("Reset Field");
-    resetBtn.setToolTipText("Restore vector field to its default initial state");
-    resetBtn.getAccessibleContext().setAccessibleName("Reset Vector Field");
-    resetBtn.getAccessibleContext().setAccessibleDescription("Resets the vector field to its default state");
-    resetBtn.addActionListener(e -> {
-      animateButtonPress(resetBtn);
-      if (listener != null) {
-        listener.onResetVectorField();
-      }
-    });
-    JButton randomBtn = rowButton("Randomize Field");
-    randomBtn.setToolTipText("Generate a completely random vector field with new direction and magnitude values");
-    randomBtn.getAccessibleContext().setAccessibleName("Randomize Vector Field");
-    randomBtn.getAccessibleContext().setAccessibleDescription("Generates random vector field values");
-    randomBtn.addActionListener(e -> {
-      animateButtonPress(randomBtn);
-      if (listener != null) {
-        listener.onRandomVectorField();
-      }
-    });
-    actSection.add(resetBtn);
-    pad(actSection);
-    actSection.add(randomBtn);
-    root.add(actSection);
-
-    root.add(Box.createVerticalGlue());
-    return root;
-  }
-
-  // ────────────────────────────────────────────────────────────────────
-  // TAB 3 — Sketch
-  // ────────────────────────────────────────────────────────────────────
-  private JPanel buildSketchTab() {
-    JPanel root = new JPanel();
-    root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(COLOR_PANEL_BG);
-    root.setBorder(BorderFactory.createEmptyBorder(SECTION_PADDING, SECTION_PADDING, SECTION_PADDING, SECTION_PADDING));
-
-    // Visibility
-    JPanel visSection = section("Visibility");
-    JCheckBox showStrokes = rowCheckBox("Show Strokes", false);
-    showStrokes.setToolTipText("Toggle whether your sketch strokes are visible on the canvas");
-    showStrokes.getAccessibleContext().setAccessibleName("Show Strokes");
-    showStrokes.getAccessibleContext().setAccessibleDescription("Toggle sketch strokes visibility on canvas");
-    showStrokes.addActionListener(e -> { if (listener != null) listener.onSketchToggle(showStrokes.isSelected()); });
-    visSection.add(showStrokes);
-    root.add(visSection);
-    pad(root);
-
-    // Tool Mode (Brush vs Eraser)
-    JPanel modeSection = section("Tool Mode");
-    JRadioButton brushRadio = new JRadioButton("Brush", true);
-    styleRadio(brushRadio);
-    brushRadio.setToolTipText("Paint mode: adds forces to guide the vector field");
-    brushRadio.getAccessibleContext().setAccessibleName("Brush Mode");
-    brushRadio.getAccessibleContext().setAccessibleDescription("Select brush mode to paint forces");
-    
-    JRadioButton eraserRadio = new JRadioButton("Eraser", false);
-    styleRadio(eraserRadio);
-    eraserRadio.setToolTipText("Erase mode: reduces field vectors toward zero");
-    eraserRadio.getAccessibleContext().setAccessibleName("Eraser Mode");
-    eraserRadio.getAccessibleContext().setAccessibleDescription("Select eraser mode to reduce vector field");
-    
-    ButtonGroup modeGroup = new ButtonGroup();
-    modeGroup.add(brushRadio);
-    modeGroup.add(eraserRadio);
-    
-    brushRadio.addActionListener(e -> { if (listener != null) listener.onBrushModeChanged(true); });
-    eraserRadio.addActionListener(e -> { if (listener != null) listener.onBrushModeChanged(false); });
-    
-    modeSection.add(brushRadio);
-    modeSection.add(eraserRadio);
-    root.add(modeSection);
-    pad(root);
-
-    // Appearance
-    JPanel appearSection = section("Appearance");
-    JLabel alphaLabel = rowLabel("Transparency: 100%");
-    appearSection.add(alphaLabel);
-    JSlider alphaSlider = rowSlider(0, 100, 100);
-    alphaSlider.setToolTipText("Control the opacity of sketch strokes (0% = invisible, 100% = fully opaque)");
-    alphaSlider.getAccessibleContext().setAccessibleName("Sketch Transparency");
-    alphaSlider.getAccessibleContext().setAccessibleDescription("Adjust sketch transparency from 0 to 100 percent");
-    alphaSlider.addChangeListener(e -> {
-      alphaLabel.setText(String.format("Transparency: %d%%", alphaSlider.getValue()));
-      if (listener != null) listener.onSketchTransparencyChanged(alphaSlider.getValue() / 100.0f);
-    });
-    appearSection.add(alphaSlider);
-    root.add(appearSection);
-    pad(root);
-
-    // Brush settings
-    JPanel brushSection = section("Brush Settings");
-
-    brushSizeLabel = rowLabel("Size: 30");
-    brushSection.add(brushSizeLabel);
-    JSlider sizeSlider = rowSlider(5, 200, 30);
-    sizeSlider.setToolTipText("Brush diameter in pixels: 5 (tiny) to 200 (huge). Affects stroke width");
-    sizeSlider.getAccessibleContext().setAccessibleName("Brush Size");
-    sizeSlider.getAccessibleContext().setAccessibleDescription("Adjust brush size from 5 to 200 pixels");
-    sizeSlider.addChangeListener(e -> {
-      float v = sizeSlider.getValue();
-      brushSizeLabel.setText(String.format("Size: %.0f", v));
-      if (listener != null) listener.onBrushSizeChanged(v);
-    });
-    brushSection.add(sizeSlider);
-    pad(brushSection);
-
-    brushHardnessLabel = rowLabel("Hardness: 0.50");
-    brushSection.add(brushHardnessLabel);
-    JSlider hardSlider = rowSlider(0, 100, 50);
-    hardSlider.setToolTipText("Edge softness: 0 (soft blur) to 1.0 (hard edges). Controls stroke falloff");
-    hardSlider.getAccessibleContext().setAccessibleName("Brush Hardness");
-    hardSlider.getAccessibleContext().setAccessibleDescription("Adjust brush hardness from 0.00 to 1.00");
-    hardSlider.addChangeListener(e -> {
-      float v = hardSlider.getValue() / 100.0f;
-      brushHardnessLabel.setText(String.format("Hardness: %.2f", v));
-      if (listener != null) listener.onBrushHardnessChanged(v);
-    });
-    brushSection.add(hardSlider);
-    pad(brushSection);
-
-    brushStrengthLabel = rowLabel("Strength: 2.0");
-    brushSection.add(brushStrengthLabel);
-    JSlider strengthSlider = rowSlider(1, 50, 20);
-    strengthSlider.setToolTipText("Opacity intensity per brush stroke: 0.1 (faint) to 5.0 (intense). Controls color intensity");
-    strengthSlider.getAccessibleContext().setAccessibleName("Brush Strength");
-    strengthSlider.getAccessibleContext().setAccessibleDescription("Adjust brush strength from 0.1 to 5.0");
-    strengthSlider.addChangeListener(e -> {
-      float v = strengthSlider.getValue() / 10.0f;
-      brushStrengthLabel.setText(String.format("Strength: %.1f", v));
-      if (listener != null) listener.onBrushStrengthChanged(v);
-    });
-    brushSection.add(strengthSlider);
-    root.add(brushSection);
-    pad(root);
-
-    // Actions
-    JPanel actSection = section("Actions");
-    JButton clearBtn = rowButton("Clear Strokes");
-    clearBtn.setToolTipText("Permanently erase all sketch strokes from the canvas (cannot be undone)");
-    clearBtn.getAccessibleContext().setAccessibleName("Clear Sketch Strokes");
-    clearBtn.getAccessibleContext().setAccessibleDescription("Removes all sketch strokes from the canvas");
-    clearBtn.addActionListener(e -> {
-      animateButtonPress(clearBtn);
-      if (listener != null) {
-        listener.onClearSketch();
-      }
-    });
-    actSection.add(clearBtn);
-    root.add(actSection);
-
-    root.add(Box.createVerticalGlue());
-    return root;
-  }
-
-  // ────────────────────────────────────────────────────────────────────
-  // TAB 4 — Botfield
-  // ────────────────────────────────────────────────────────────────────
-  private JPanel buildBotfieldTab() {
-    JPanel root = new JPanel();
-    root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-    root.setBackground(COLOR_PANEL_BG);
-    root.setBorder(BorderFactory.createEmptyBorder(SECTION_PADDING, SECTION_PADDING, SECTION_PADDING, SECTION_PADDING));
-
-    // Visibility
-    JPanel visSection = section("Visibility");
-    JCheckBox showBots = rowCheckBox("Show Botfield", true);
-    showBots.setToolTipText("Toggle whether bots and their visualizations are visible on the canvas");
-    showBots.getAccessibleContext().setAccessibleName("Show Botfield");
-    showBots.getAccessibleContext().setAccessibleDescription("Toggle botfield visualization visibility");
-    showBots.addActionListener(e -> { if (listener != null) listener.onBotfieldToggle(showBots.isSelected()); });
-    visSection.add(showBots);
-    root.add(visSection);
-    pad(root);
-
-    // Appearance
-    JPanel appearSection = section("Appearance");
-    JLabel alphaLabel = rowLabel("Transparency: 100%");
-    appearSection.add(alphaLabel);
-    JSlider alphaSlider = rowSlider(0, 100, 100);
-    alphaSlider.setToolTipText("Control how visible bots and their trails appear (0% = invisible, 100% = fully opaque)");
-    alphaSlider.getAccessibleContext().setAccessibleName("Botfield Transparency");
-    alphaSlider.getAccessibleContext().setAccessibleDescription("Adjust botfield transparency from 0 to 100 percent");
-    alphaSlider.addChangeListener(e -> {
-      alphaLabel.setText(String.format("Transparency: %d%%", alphaSlider.getValue()));
-      if (listener != null) listener.onBotfieldTransparencyChanged(alphaSlider.getValue() / 100.0f);
-    });
-    appearSection.add(alphaSlider);
-    root.add(appearSection);
-    pad(root);
-
-    // Bot settings
-    JPanel botSection = section("Bot Settings");
-    
-    JCheckBox luminanceDecay = rowCheckBox("Luminance-Based Life Decay", false);
-    luminanceDecay.setToolTipText("Enable background-aware bot life decay: bots live longer in bright areas, die faster in dark areas");
-    luminanceDecay.getAccessibleContext().setAccessibleName("Luminance-Based Life Decay");
-    luminanceDecay.getAccessibleContext().setAccessibleDescription("Toggle whether bot life decays based on background luminance");
-    luminanceDecay.addActionListener(e -> { if (listener != null) listener.onBotLuminanceDecayToggle(luminanceDecay.isSelected()); });
-    botSection.add(luminanceDecay);
-    pad(botSection);
-    
-    JCheckBox traceFade = rowCheckBox("Trace Fade Out", true);
-    traceFade.setToolTipText("Toggle fade out effect on bot traces: older traces become more transparent");
-    traceFade.getAccessibleContext().setAccessibleName("Bot Trace Fade");
-    traceFade.getAccessibleContext().setAccessibleDescription("Enable or disable fade effect on bot traces");
-    traceFade.addActionListener(e -> { if (listener != null) listener.onBotTraceFadeToggle(traceFade.isSelected()); });
-    botSection.add(traceFade);
-    pad(botSection);
-
-    botLifeLabel = rowLabel("Life: 500");
-    botSection.add(botLifeLabel);
-    JSlider lifeSlider = rowSlider(100, 2000, 500);
-    lifeSlider.setToolTipText("How long bots survive before disappearing (in simulation ticks): 100 (short) to 2000 (long)");
-    lifeSlider.getAccessibleContext().setAccessibleName("Bot Life");
-    lifeSlider.getAccessibleContext().setAccessibleDescription("Adjust bot life span from 100 to 2000 ticks");
-    lifeSlider.addChangeListener(e -> {
-      botLifeLabel.setText(String.format("Life: %d", lifeSlider.getValue()));
-      if (listener != null) listener.onBotLifeChanged(lifeSlider.getValue());
-    });
-    botSection.add(lifeSlider);
-    pad(botSection);
-
-    botRadarLabel = rowLabel("Radar: 50");
-    botSection.add(botRadarLabel);
-    JSlider radarSlider = rowSlider(10, 200, 50);
-    radarSlider.setToolTipText("How far bots can sense their environment (detection range in pixels): 10 (short) to 200 (far)");
-    radarSlider.getAccessibleContext().setAccessibleName("Bot Radar Range");
-    radarSlider.getAccessibleContext().setAccessibleDescription("Adjust bot radar sensing range from 10 to 200 pixels");
-    radarSlider.addChangeListener(e -> {
-      botRadarLabel.setText(String.format("Radar: %d", radarSlider.getValue()));
-      if (listener != null) listener.onBotRadarChanged(radarSlider.getValue());
-    });
-    botSection.add(radarSlider);
-    pad(botSection);
-
-    botSpeedLabel = rowLabel("Speed: 2.0");
-    botSection.add(botSpeedLabel);
-    JSlider speedSlider = rowSlider(1, 50, 20);
-    speedSlider.setToolTipText("Maximum movement speed (pixels per tick): controls how fast bots travel regardless of force balance");
-    speedSlider.getAccessibleContext().setAccessibleName("Bot Speed");
-    speedSlider.getAccessibleContext().setAccessibleDescription("Adjust bot maximum speed from 0.1 to 5.0 pixels per tick");
-    speedSlider.addChangeListener(e -> {
-      float v = speedSlider.getValue() / 10.0f;
-      botSpeedLabel.setText(String.format("Speed: %.1f", v));
-      if (listener != null) listener.onBotSpeedChanged(v);
-    });
-    botSection.add(speedSlider);
-    pad(botSection);
-
-    root.add(botSection);
-    pad(root);
-
-    // Force Balance — the 3 directional forces that determine trajectory
-    JPanel forceSection = section("Force Balance");
-    
-    JLabel fieldInfluenceLabel = rowLabel("Field: 1.00");
-    forceSection.add(fieldInfluenceLabel);
-    JSlider fieldInfluenceSlider = rowSlider(0, 100, 100);
-    fieldInfluenceSlider.setToolTipText("Vector field force: how strongly bots follow the flow field. 0 = ignore field, 1.0 = follow field fully");
-    fieldInfluenceSlider.getAccessibleContext().setAccessibleName("Field Force");
-    fieldInfluenceSlider.getAccessibleContext().setAccessibleDescription("Adjust vector field force weight from 0.0 to 1.0");
-    fieldInfluenceSlider.addChangeListener(e -> {
-      float v = fieldInfluenceSlider.getValue() / 100.0f;
-      fieldInfluenceLabel.setText(String.format("Field: %.2f", v));
-      if (listener != null) listener.onBotFieldInfluenceChanged(v);
-    });
-    forceSection.add(fieldInfluenceSlider);
-    pad(forceSection);
-
-    JLabel driftInfluenceLabel = rowLabel("Drift: 0.30");
-    forceSection.add(driftInfluenceLabel);
-    JSlider driftInfluenceSlider = rowSlider(0, 100, 30);
-    driftInfluenceSlider.setToolTipText("Random drift force: adds organic variation to paths. 0 = no randomness, 1.0 = strong random walk");
-    driftInfluenceSlider.getAccessibleContext().setAccessibleName("Drift Force");
-    driftInfluenceSlider.getAccessibleContext().setAccessibleDescription("Adjust drift force weight from 0.0 to 1.0");
-    driftInfluenceSlider.addChangeListener(e -> {
-      float v = driftInfluenceSlider.getValue() / 100.0f;
-      driftInfluenceLabel.setText(String.format("Drift: %.2f", v));
-      if (listener != null) listener.onBotDriftInfluenceChanged(v);
-    });
-    forceSection.add(driftInfluenceSlider);
-    pad(forceSection);
-    
-    JLabel repulsionInfluenceLabel = rowLabel("Repulsion: 0.00");
-    forceSection.add(repulsionInfluenceLabel);
-    JSlider repulsionInfluenceSlider = rowSlider(0, 100, 0);
-    repulsionInfluenceSlider.setToolTipText("Repulsion force: pushes bots away from existing traces. 0 = ignore traces, 1.0 = strong avoidance");
-    repulsionInfluenceSlider.getAccessibleContext().setAccessibleName("Repulsion Force");
-    repulsionInfluenceSlider.getAccessibleContext().setAccessibleDescription("Adjust repulsion force weight from 0.0 to 1.0");
-    repulsionInfluenceSlider.addChangeListener(e -> {
-      float v = repulsionInfluenceSlider.getValue() / 100.0f;
-      repulsionInfluenceLabel.setText(String.format("Repulsion: %.2f", v));
-      if (listener != null) listener.onBotRepulsionInfluenceChanged(v);
-    });
-    forceSection.add(repulsionInfluenceSlider);
-    pad(forceSection);
-
-    JLabel repulsionRadiusLabel = rowLabel("Repulsion Radius: 50");
-    forceSection.add(repulsionRadiusLabel);
-    JSlider repulsionRadiusSlider = rowSlider(10, 200, 50);
-    repulsionRadiusSlider.setToolTipText("Detection range for repulsion: how far away traces are sensed. Only relevant when Repulsion > 0");
-    repulsionRadiusSlider.getAccessibleContext().setAccessibleName("Repulsion Radius");
-    repulsionRadiusSlider.getAccessibleContext().setAccessibleDescription("Adjust repulsion detection radius from 10 to 200 pixels");
-    repulsionRadiusSlider.addChangeListener(e -> {
-      int v = repulsionRadiusSlider.getValue();
-      repulsionRadiusLabel.setText(String.format("Repulsion Radius: %d", v));
-      if (listener != null) listener.onBotRepulsionRadiusChanged(v);
-    });
-    forceSection.add(repulsionRadiusSlider);
-    root.add(forceSection);
-    pad(root);
-
-    // Radar Sampling — multi-point field aggregation with distance curves
-    JPanel radarSection = section("Radar Sampling");
-    
-    JLabel falloffLabel = rowLabel("Falloff Type: Gaussian");
-    radarSection.add(falloffLabel);
-    
-    JPanel falloffPanel = new JPanel();
-    falloffPanel.setLayout(new BoxLayout(falloffPanel, BoxLayout.Y_AXIS));
-    falloffPanel.setBackground(COLOR_PANEL_BG);
-    falloffPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-    
-    ButtonGroup falloffGroup = new ButtonGroup();
-    
-    JRadioButton linearRadio = new JRadioButton("Linear");
-    styleRadio(linearRadio);
-    linearRadio.setToolTipText("Linear falloff: samples closer to center have more weight");
-    linearRadio.addActionListener(e -> {
-      if (linearRadio.isSelected()) {
-        falloffLabel.setText("Falloff Type: Linear");
-        if (listener != null) listener.onRadarSamplingFalloffChanged("Linear");
-      }
-    });
-    falloffGroup.add(linearRadio);
-    falloffPanel.add(linearRadio);
-    
-    JRadioButton gaussianRadio = new JRadioButton("Gaussian");
-    styleRadio(gaussianRadio);
-    gaussianRadio.setToolTipText("Gaussian falloff (default): smoother curve emphasizing center samples");
-    gaussianRadio.setSelected(true);
-    gaussianRadio.addActionListener(e -> {
-      if (gaussianRadio.isSelected()) {
-        falloffLabel.setText("Falloff Type: Gaussian");
-        if (listener != null) listener.onRadarSamplingFalloffChanged("Gaussian");
-      }
-    });
-    falloffGroup.add(gaussianRadio);
-    falloffPanel.add(gaussianRadio);
-    
-    JRadioButton hardEdgeRadio = new JRadioButton("Hard Edge");
-    styleRadio(hardEdgeRadio);
-    hardEdgeRadio.setToolTipText("Hard edge falloff: constant weighting (flat aggregation)");
-    hardEdgeRadio.addActionListener(e -> {
-      if (hardEdgeRadio.isSelected()) {
-        falloffLabel.setText("Falloff Type: Hard Edge");
-        if (listener != null) listener.onRadarSamplingFalloffChanged("Hard Edge");
-      }
-    });
-    falloffGroup.add(hardEdgeRadio);
-    falloffPanel.add(hardEdgeRadio);
-    
-    radarSection.add(falloffPanel);
-    pad(radarSection);
-    
-    JLabel samplesLabel = rowLabel("Samples: 16");
-    radarSection.add(samplesLabel);
-    JSlider samplesSlider = rowSlider(4, 32, 16);
-    samplesSlider.setToolTipText("Number of radial sampling points around each bot: more = smoother motion but more computation");
-    samplesSlider.getAccessibleContext().setAccessibleName("Radar Samples");
-    samplesSlider.getAccessibleContext().setAccessibleDescription("Adjust number of radar samples from 4 to 32");
-    samplesSlider.addChangeListener(e -> {
-      int samples = samplesSlider.getValue();
-      samplesLabel.setText(String.format("Samples: %d", samples));
-      if (listener != null) listener.onRadarSamplesChanged(samples);
-    });
-    radarSection.add(samplesSlider);
-    pad(radarSection);
-    
-    JLabel sampleDistLabel = rowLabel("Sample Distance: 0.70");
-    radarSection.add(sampleDistLabel);
-    JSlider sampleDistSlider = rowSlider(25, 100, 70);  // Stored as 0-100% in slider
-    sampleDistSlider.setToolTipText("Distance for radial samples: fraction of radar radius (where samples are taken): 0.25 = 25% of radius, 1.0 = at edge");
-    sampleDistSlider.getAccessibleContext().setAccessibleName("Sample Distance");
-    sampleDistSlider.getAccessibleContext().setAccessibleDescription("Adjust sample distance from 0.25 to 1.0 of radar radius");
-    sampleDistSlider.addChangeListener(e -> {
-      float distance = sampleDistSlider.getValue() / 100.0f;
-      sampleDistLabel.setText(String.format("Sample Distance: %.2f", distance));
-      if (listener != null) listener.onRadarSampleDistanceChanged(distance);
-    });
-    radarSection.add(sampleDistSlider);
-    pad(radarSection);
-    
-    JLabel centerWeightLabel = rowLabel("Center Weight: 1.50");
-    radarSection.add(centerWeightLabel);
-    JSlider centerWeightSlider = rowSlider(10, 300, 150);  // Stored as 0-300 (1x-3x weight)
-    centerWeightSlider.setToolTipText("Extra weight for center sample to emphasize local field influence: higher = more focus on center");
-    centerWeightSlider.getAccessibleContext().setAccessibleName("Center Sample Weight");
-    centerWeightSlider.getAccessibleContext().setAccessibleDescription("Adjust center sample weight from 0.1 to 3.0");
-    centerWeightSlider.addChangeListener(e -> {
-      float weight = centerWeightSlider.getValue() / 100.0f;
-      centerWeightLabel.setText(String.format("Center Weight: %.2f", weight));
-      if (listener != null) listener.onCenterSampleWeightChanged(weight);
-    });
-    radarSection.add(centerWeightSlider);
-    root.add(radarSection);
-    pad(root);
-
-    // Simulation settings
-    JPanel simSection = section("Simulation");
-
-    // Simulation controls (Start/Pause/Reset)
-    JPanel ctrlPanel = new JPanel();
-    ctrlPanel.setLayout(new BoxLayout(ctrlPanel, BoxLayout.X_AXIS));
-    ctrlPanel.setBackground(COLOR_PANEL_BG);
-    ctrlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-    
-    simToggleBtn = rowButton("\u25B6 Play");
-    simToggleBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
-    simToggleBtn.setToolTipText("Start or pause the bot simulation");
-    simToggleBtn.getAccessibleContext().setAccessibleName("Toggle Simulation");
-    simToggleBtn.getAccessibleContext().setAccessibleDescription("Toggle between running and paused simulation");
-    simToggleBtn.addActionListener(e -> {
-      animateButtonPress(simToggleBtn);
-      if (listener != null) listener.onSimulationToggle();
-    });
-    ctrlPanel.add(simToggleBtn);
-    ctrlPanel.add(Box.createHorizontalStrut(4));
-    
-    JButton resetBtn = rowButton("\u21BA Reset");
-    resetBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, BUTTON_HEIGHT));
-    resetBtn.setToolTipText("Stop simulation and clear all bots and their traces");
-    resetBtn.getAccessibleContext().setAccessibleName("Reset Simulation");
-    resetBtn.getAccessibleContext().setAccessibleDescription("Stop simulation and remove all bots and traces");
-    resetBtn.addActionListener(e -> {
-      animateButtonPress(resetBtn);
-      if (listener != null) listener.onSimulationReset();
-    });
-    ctrlPanel.add(resetBtn);
-    
-    simSection.add(ctrlPanel);
-    pad(simSection);
-    
-    // Live bot counter
-    botCountLabel = rowLabel("Active: 0  |  Traces: 0");
-    botCountLabel.setForeground(COLOR_ACCENT_GREEN);
-    simSection.add(botCountLabel);
-    pad(simSection);
-
-    botNumberLabel = rowLabel("Bot Number: 50");
-    simSection.add(botNumberLabel);
-    JSlider numberSlider = rowSlider(1, 500, 50);
-    numberSlider.setToolTipText("Target number of active bots: during auto-spawn, bots spawn until reaching this count. When clicking 'Spawn Bot', creates this many bots at once.");
-    numberSlider.getAccessibleContext().setAccessibleName("Bot Number");
-    numberSlider.getAccessibleContext().setAccessibleDescription("Adjust target bot count from 1 to 500");
-    numberSlider.addChangeListener(e -> {
-      int num = numberSlider.getValue();
-      botNumberLabel.setText(String.format("Bot Number: %d", num));
-      if (listener != null) listener.onBotNumberChanged(num);
-    });
-    simSection.add(numberSlider);
-    pad(simSection);
-
-    JCheckBox autoSpawn = rowCheckBox("Auto Spawn", false);
-    autoSpawn.setToolTipText("Enable automatic spawning of bots at the rate specified above");
-    autoSpawn.getAccessibleContext().setAccessibleName("Auto Spawn Bots");
-    autoSpawn.getAccessibleContext().setAccessibleDescription("Enable automatic bot spawning at configured rate");
-    autoSpawn.addActionListener(e -> { if (listener != null) listener.onAutoSpawnToggle(autoSpawn.isSelected()); });
-    simSection.add(autoSpawn);
-    pad(simSection);
-
-    JButton spawnBtn = rowButton("Spawn Bot");
-    spawnBtn.setToolTipText("Immediately spawn bots up to the Bot Number target (regardless of auto-spawn setting)");
-    spawnBtn.getAccessibleContext().setAccessibleName("Spawn Bots");
-    spawnBtn.getAccessibleContext().setAccessibleDescription("Spawns bots up to the configured Bot Number target");
-    spawnBtn.addActionListener(e -> {
-      animateButtonPress(spawnBtn);
-      if (listener != null) {
-        listener.onSpawnBot();
-      }
-    });
-    simSection.add(spawnBtn);
-    pad(simSection);
-
-    JButton clearBotsBtn = rowButton("Clear Bots");
-    clearBotsBtn.setToolTipText("Remove all bots and their traces (cannot be undone)");
-    clearBotsBtn.getAccessibleContext().setAccessibleName("Clear All Bots");
-    clearBotsBtn.getAccessibleContext().setAccessibleDescription("Removes all active bots and their traces");
-    clearBotsBtn.addActionListener(e -> {
-      animateButtonPress(clearBotsBtn);
-      if (listener != null) {
-        listener.onClearBots();
-      }
-    });
-    simSection.add(clearBotsBtn);
-    pad(simSection);
-    
-    JButton clearTracesBtn = rowButton("Clear Traces");
-    clearTracesBtn.setToolTipText("Clear all trace paths while keeping live bots active");
-    clearTracesBtn.getAccessibleContext().setAccessibleName("Clear Traces");
-    clearTracesBtn.getAccessibleContext().setAccessibleDescription("Clears all accumulated trace paths but keeps live bots running");
-    clearTracesBtn.addActionListener(e -> {
-      animateButtonPress(clearTracesBtn);
-      if (listener != null) {
-        listener.onClearTraces();
-      }
-    });
-    simSection.add(clearTracesBtn);
-    root.add(simSection);
-
-    root.add(Box.createVerticalGlue());
-    return root;
-  }
-
-  // ── Radio button styling helper ────────────────────────────────────
-  private void styleRadio(JRadioButton rb) {
-    rb.setBackground(COLOR_PANEL_BG);
-    rb.setFont(new Font("Arial", Font.PLAIN, 11));
-    rb.setAlignmentX(Component.LEFT_ALIGNMENT);
-    rb.setFocusable(true);  // Ensure radio button is reachable via Tab
-    rb.setFocusPainted(false);  // No Swing focus painting
-    
-    // Update text color based on selection state
-    updateRadioTextColor(rb);
-    
-    // Add listener to update text color when selection changes
-    rb.addChangeListener(e -> updateRadioTextColor(rb));
-    
-    // Add hover effect
-    addRadioButtonHoverEffect(rb);
-  }
-  
-  // Helper: Update radio button text color based on selection
-  private void updateRadioTextColor(JRadioButton rb) {
-    if (rb.isSelected()) {
-      rb.setForeground(COLOR_BUTTON_HOVER);  // Glow green when selected
-    } else {
-      rb.setForeground(COLOR_BUTTON_DEFAULT);  // Normal green when not selected
-    }
-  }
-  
-  // ════════════════════════════════════════════════════════════════════════════════
-  // CustomTabbedPaneUI - Rounded corners on tabs + fill container width
-  // ════════════════════════════════════════════════════════════════════════════════
-  private static class RoundedTabbedPaneUI extends javax.swing.plaf.basic.BasicTabbedPaneUI {
-    private static final int TAB_RADIUS = 10;
-    private static final int TAB_HEIGHT = 40;
-    
-    @Override
-    public void paint(Graphics g, JComponent c) {
-      Graphics2D g2 = (Graphics2D) g;
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      
-      // Recalculate tab positions before painting to fill width
-      int tabCount = tabPane.getTabCount();
-      if (tabCount > 0) {
-        int containerWidth = tabPane.getWidth();
-        int tabWidth = containerWidth / tabCount;
-        int tabHeight = TAB_HEIGHT;
-        
-        // Redistribute all tab rects to fill the full width
-        for (int i = 0; i < tabCount && i < rects.length; i++) {
-          rects[i].x = i * tabWidth;
-          rects[i].y = 0;
-          rects[i].width = (i == tabCount - 1) ? containerWidth - (i * tabWidth) : tabWidth;
-          rects[i].height = tabHeight;
-        }
-      }
-      
-      super.paint(g2, c);
-    }
-    
-    @Override
-    protected Rectangle getTabBounds(int tabIndex, Rectangle dest) {
-      Rectangle bounds = super.getTabBounds(tabIndex, dest);
-      if (bounds != null && tabIndex < rects.length) {
-        bounds.width = rects[tabIndex].width;
-      }
-      return bounds;
-    }
-    
-    @Override
-    protected int calculateTabHeight(int tabPlacement, int tabIndex, int fontHeight) {
-      return TAB_HEIGHT;
-    }
-    
-    @Override
-    protected Insets getContentBorderInsets(int tabPlacement) {
-      // Remove any insets that could crop the content
-      return new Insets(0, 0, 0, 0);
-    }
-    
-    @Override
-    protected int getTabLabelShiftX(int tabPlacement, int tabIndex, boolean isSelected) {
-      return 0;  // No shift
-    }
-    
-    @Override
-    protected int getTabLabelShiftY(int tabPlacement, int tabIndex, boolean isSelected) {
-      return 0;  // No shift
-    }
-    
-    @Override
-    protected int calculateTabWidth(int tabPlacement, int tabIndex, FontMetrics metrics) {
-      // Distribute width evenly across all tabs
-      int containerWidth = tabPane.getWidth();
-      int tabCount = tabPane.getTabCount();
-      
-      if (containerWidth <= 0 || tabCount <= 0) {
-        return super.calculateTabWidth(tabPlacement, tabIndex, metrics);
-      }
-      
-      return containerWidth / tabCount;
-    }
-    
-    @Override
-    protected void paintTab(Graphics g, int tabPlacement, Rectangle[] rects, int tabIndex, Rectangle iconRect, Rectangle textRect) {
-      if (tabIndex >= rects.length) return;
-      
-      Graphics2D g2 = (Graphics2D) g;
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-      
-      Rectangle rect = rects[tabIndex];
-      boolean isSelected = (tabIndex == tabPane.getSelectedIndex());
-      
-      // Draw tab background with rounded corners
-      RoundRectangle2D roundRect = new RoundRectangle2D.Double(rect.x, rect.y, rect.width, rect.height, TAB_RADIUS, TAB_RADIUS);
-      
-      if (isSelected) {
-        g2.setColor(COLOR_PANEL_BG);
-      } else {
-        g2.setColor(new Color(50, 50, 50));
-      }
-      g2.fill(roundRect);
-      
-      // Draw inset border inside the tab
-      int inset = 2;
-      RoundRectangle2D insetRect = new RoundRectangle2D.Double(
-        rect.x + inset, rect.y + inset, 
-        rect.width - (inset * 2), rect.height - inset, 
-        TAB_RADIUS - 2, TAB_RADIUS - 2
-      );
-      
-      if (isSelected) {
-        g2.setColor(COLOR_ACCENT_GREEN);
-        g2.setStroke(new BasicStroke(2));
-      } else {
-        g2.setColor(new Color(70, 70, 70));
-        g2.setStroke(new BasicStroke(1));
-      }
-      g2.draw(insetRect);
-      
-      // Draw bottom separator line only for unselected tabs
-      if (!isSelected) {
-        g2.setColor(COLOR_ACCENT_GREEN);
-        g2.setStroke(new BasicStroke(1));
-        g2.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width, rect.y + rect.height - 1);
-      }
-      
-      // Draw text
-      String title = tabPane.getTitleAt(tabIndex);
-      Font font = tabPane.getFont().deriveFont(Font.BOLD, 12f);
-      g2.setFont(font);
-      g2.setColor(COLOR_TEXT_TAB);
-      
-      FontMetrics fm = g2.getFontMetrics();
-      int textWidth = fm.stringWidth(title);
-      int textHeight = fm.getAscent();
-      
-      int centerX = rect.x + (rect.width - textWidth) / 2;
-      int centerY = rect.y + ((rect.height - textHeight) / 2) + fm.getAscent();
-      
-      g2.drawString(title, centerX, centerY);
-    }
-  }
-  
-  
-  // ════════════════════════════════════════════════════════════════════════════════
-  // CustomSliderUI - Green thumb on dark track with clean styling
-  // ════════════════════════════════════════════════════════════════════════════════
-  private static class CustomSliderUI extends javax.swing.plaf.basic.BasicSliderUI {
-    private static final int THUMB_WIDTH = 14;
-    private static final int THUMB_HEIGHT = 24;
-    private static final int TRACK_HEIGHT = 6;
-    
-    private boolean thumbHovered = false;
-    private boolean thumbPressed = false;
-    
-    public CustomSliderUI(JSlider slider) {
-      super(slider);
-      
-      // Add mouse listener for hover and press tracking
-      slider.addMouseListener(new MouseAdapter() {
-        @Override
-        public void mouseEntered(MouseEvent e) {
-          updateThumbHover(e);
-        }
-        
-        @Override
-        public void mouseMoved(MouseEvent e) {
-          updateThumbHover(e);
-        }
-        
-        @Override
-        public void mouseExited(MouseEvent e) {
-          thumbHovered = false;
-          slider.repaint();
-        }
-        
-        @Override
-        public void mousePressed(MouseEvent e) {
-          thumbPressed = true;
-          slider.repaint();
-        }
-        
-        @Override
-        public void mouseReleased(MouseEvent e) {
-          thumbPressed = false;
-          updateThumbHover(e);
-        }
-        
-        private void updateThumbHover(MouseEvent e) {
-          Rectangle thumbArea = new Rectangle(thumbRect);
-          thumbArea.grow(4, 4); // Expand hover area slightly
-          thumbHovered = thumbArea.contains(e.getPoint());
-          slider.repaint();
-        }
-      });
-    }
-    
-    @Override
-    public void paint(Graphics g, JComponent c) {
-      Graphics2D g2 = (Graphics2D) g;
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      
-      recalculateIfInsetsChanged();
-      recalculateIfOrientationChanged();
-      
-      Rectangle clip = g2.getClipBounds();
-      
-      // Paint track
-      if (clip.intersects(trackRect)) {
-        paintTrack(g2);
-      }
-      
-      // Paint ticks
-      if (slider.getPaintTicks() && clip.intersects(tickRect)) {
-        paintTicks(g2);
-      }
-      
-      // Paint labels
-      if (slider.getPaintLabels() && clip.intersects(labelRect)) {
-        paintLabels(g2);
-      }
-      
-      // Paint thumb
-      if (clip.intersects(thumbRect)) {
-        paintThumb(g2);
-      }
-      
-      // Paint focus ring
-      if (slider.hasFocus() && clip.intersects(focusRect)) {
-        paintFocus(g2);
-      }
-    }
-    
-    public void paintTrack(Graphics g) {
-      Graphics2D g2 = (Graphics2D) g;
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      
-      int trackY = trackRect.y + (trackRect.height - TRACK_HEIGHT) / 2;
-      
-      if (slider.getOrientation() == JSlider.HORIZONTAL) {
-        int thumbX = thumbRect.x + thumbRect.width / 2;
-        
-        // Left side (filled): Normal green
-        g2.setColor(COLOR_BUTTON_DEFAULT);
-        g2.fillRect(trackRect.x, trackY, thumbX - trackRect.x, TRACK_HEIGHT);
-        
-        // Right side (unfilled): Dark grey
-        g2.setColor(new Color(80, 80, 80));
-        g2.fillRect(thumbX, trackY, trackRect.x + trackRect.width - thumbX, TRACK_HEIGHT);
-      }
-    }
-    
-    public void paintThumb(Graphics g) {
-      Graphics2D g2 = (Graphics2D) g;
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      
-      // Determine thumb color based on state
-      Color thumbColor;
-      Color borderColor;
-      
-      if (thumbPressed) {
-        // White on press
-        thumbColor = Color.WHITE;
-        borderColor = Color.LIGHT_GRAY;
-      } else if (thumbHovered) {
-        // Glow green on hover
-        thumbColor = COLOR_BUTTON_HOVER;
-        borderColor = COLOR_BUTTON_HOVER;
-      } else {
-        // Normal green (rest state)
-        thumbColor = COLOR_BUTTON_DEFAULT;
-        borderColor = new Color(0, 150, 0);
-      }
-      
-      RoundRectangle2D thumb = new RoundRectangle2D.Double(
-        thumbRect.x, thumbRect.y, thumbRect.width, thumbRect.height, 4, 4
-      );
-      
-      g2.setColor(thumbColor);
-      g2.fill(thumb);
-      
-      // Border for definition
-      g2.setColor(borderColor);
-      g2.setStroke(new BasicStroke(1));
-      g2.draw(thumb);
-    }
-    
-    public void paintFocus(Graphics g) {
-      Graphics2D g2 = (Graphics2D) g;
-      g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      
-      g2.setColor(COLOR_TEXT_PRIMARY);
-      g2.setStroke(new BasicStroke(2));
-      int margin = 2;
-      g2.drawRect(
-        focusRect.x - margin, focusRect.y - margin,
-        focusRect.width + margin * 2, focusRect.height + margin * 2
-      );
-    }
-  }
 }
-
