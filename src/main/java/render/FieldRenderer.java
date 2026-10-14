@@ -105,13 +105,15 @@ public class FieldRenderer {
     for (int x = 0; x < vectors.length; x++) {
       for (int y = 0; y < vectors[x].length; y++) {
         Vector2D v = vectors[x][y];
-        float mag = v.magnitude();
+        float vx = v.vx * field.getFieldMagnitudeScale();
+        float vy = v.vy * field.getFieldMagnitudeScale();
+        float mag = (float) Math.sqrt(vx * vx + vy * vy);
         
         if (mag > 0.1f) {
           float worldX = x * cellSize + cellSize / 2;
           float worldY = y * cellSize + cellSize / 2;
           
-          drawVectorAsTriangle(g2d, worldX, worldY, v.vx, v.vy, cellSize, mag);
+          drawVectorAsTriangle(g2d, worldX, worldY, vx, vy, cellSize, mag);
         }
       }
     }
@@ -137,13 +139,15 @@ public class FieldRenderer {
             
             // Interpolate vector at this position
             Vector2D interpolated = interpolateVector(vectors, gx, gy, localX, localY);
-            float mag = interpolated.magnitude();
+            float vx = interpolated.vx * field.getFieldMagnitudeScale();
+            float vy = interpolated.vy * field.getFieldMagnitudeScale();
+            float mag = (float) Math.sqrt(vx * vx + vy * vy);
             
             if (mag > 0.1f) {
               float worldX = gx * cellSize + sx * subdivisionSize + subdivisionSize / 2;
               float worldY = gy * cellSize + sy * subdivisionSize + subdivisionSize / 2;
               
-              drawVectorAsTriangle(g2d, worldX, worldY, interpolated.vx, interpolated.vy, subdivisionSize, mag);
+              drawVectorAsTriangle(g2d, worldX, worldY, vx, vy, subdivisionSize, mag);
             }
           }
         }
@@ -220,7 +224,7 @@ public class FieldRenderer {
         float lx = fx - gx;
         float ly = fy - gy;
         Vector2D interpolated = interpolateVector(vectors, gx, gy, lx, ly);
-        float mag = interpolated.magnitude();
+        float mag = interpolated.magnitude() * field.getFieldMagnitudeScale();
         float hue = (float) Math.atan2(interpolated.vy, interpolated.vx) / (float) Math.PI * 0.5f + 0.5f;
         float brightness = Math.min(mag / field.getMaxMagnitude(), 1.0f);
         int color = java.awt.Color.HSBtoRGB(hue, 1.0f, brightness);
@@ -246,7 +250,7 @@ public class FieldRenderer {
         float lx = fx - gx;
         float ly = fy - gy;
         Vector2D interpolated = interpolateVector(vectors, gx, gy, lx, ly);
-        float mag = interpolated.magnitude();
+        float mag = interpolated.magnitude() * field.getFieldMagnitudeScale();
         float hue = (float) Math.atan2(interpolated.vy, interpolated.vx) / (float) Math.PI * 0.5f + 0.5f;
         float brightness = Math.min(mag / field.getMaxMagnitude(), 1.0f);
         int color = java.awt.Color.HSBtoRGB(hue, 1.0f, brightness);

@@ -2,6 +2,7 @@ package bot;
 
 import field.Vector2D;
 import field.VectorField;
+import config.Config;
 import java.util.ArrayList;
 
 /**
@@ -15,26 +16,31 @@ public class BotEngine {
   private VectorField vectorField;
   
   // Bot parameters (configurable)
-  private float botMaxLife = 500;
-  private float botRadar = 50;    // Field sampling radius
-  private float botSpeed = 2.0f;  // Maximum velocity magnitude
+  private float botMaxLife = Config.DEFAULT_BOT_LIFE;
+  private float botRadar = Config.DEFAULT_BOT_RADAR;    // Field sampling radius
+  private float botSpeed = Config.BOT_SPEED;  // Maximum velocity magnitude
   
   // Repulsion detection range
   private float repulsionRadius = 50.0f;  // Distance range for repulsion detection
   
   // Force influence multipliers (0.0-1.0) - balance between the 3 directional forces
-  private float driftInfluence = 0.3f;        // Random drift force weight (0-1)
+  private float driftInfluence = Config.DEFAULT_BOT_DRIFT;  // Random drift force weight (0-1)
   private float fieldInfluence = 1.0f;        // Vector field force weight (0-1)
   private float repulsionInfluence = 0.0f;    // Repulsion from traces force weight (0-1)
+  private String driftMode = "unique";
+  private Vector2D collectiveDriftDirection = Vector2D.randomDirection();
+  private int collectiveDriftCounter;
   
   // Spawn configuration
   private boolean autoSpawnEnabled = false;
-  private int botNumber = 50;     // Target number of active bots (auto-spawn goal) or bots to spawn (manual spawn)
+  private int botNumber = Config.DEFAULT_BOT_COUNT;  // Auto-spawn goal or number of bots to spawn manually
+  private int botSpawnRate = Config.DEFAULT_BOT_SPAWN_RATE;
+  private int spawnFrameCounter = 0;
   private int maxBots = 500;      // Hard cap on total bots
   
   // Radar sampling configuration
   private VectorField.FalloffType radarSamplingFalloff = VectorField.FalloffType.GAUSSIAN;
-  private int radarSamples = config.Config.RADAR_SAMPLES;  // Number of radial samples (default 16)
+  private int radarSamples = Config.RADAR_SAMPLES;  // Number of radial samples (default 16)
   private float radarSampleDistance = 0.7f;  // Sample at this fraction of radar radius (0.0-1.0)
   private float centerSampleWeight = 1.5f;  // Extra weight for center sample for stability
   
@@ -50,6 +56,24 @@ public class BotEngine {
     this.bots = new ArrayList<>();
     this.deadBots = new ArrayList<>();
   }
+
+  private Vector2D driftFor(Bot bot) {
+    if ("collective".equals(driftMode)) {
+      return collectiveDriftDirection;
+    }
+    if ("canvas".equals(driftMode)) {
+      float x = bot.getPosition().vx;
+      float y = bot.getPosition().vy;
+      Vector2D direction = new Vector2D((float) Math.sin(y * 0.01f), (float) Math.cos(x * 0.01f));
+      if (direction.magnitude() == 0.0f) {
+        direction.vx = 1.0f;
+      } else {
+        direction.normalize();
+      }
+      return direction;
+    }
+    return null;
+  }
   
   /**
    * Update all bots: sample field, apply forces, advance simulation
@@ -59,18 +83,30 @@ public class BotEngine {
     if (!simulationRunning) {
       return;
     }
+
+    if ("collective".equals(driftMode)) {
+      collectiveDriftCounter++;
+      if (collectiveDriftCounter >= Config.DEFAULT_FPS) {
+        collectiveDriftCounter = 0;
+        collectiveDriftDirection = Vector2D.randomDirection();
+      }
+    }
     
-    // Spawn new bots if auto-spawn enabled (until reaching target botNumber)
-    if (autoSpawnEnabled) {
-      while (bots.size() < botNumber && bots.size() < maxBots) {
+    if (autoSpawnEnabled && bots.size() < botNumber && bots.size() < maxBots) {
+      spawnFrameCounter++;
+      int framesPerSpawn = Math.max(1, Config.DEFAULT_FPS / botSpawnRate);
+      if (spawnFrameCounter >= framesPerSpawn) {
         spawnRandomBot();
+        spawnFrameCounter = 0;
       }
     }
     
     // Create combined list of all bots (live and dead) for repulsion calculations
+    java.util.ArrayList<Bot> liveBots = new java.util.ArrayList<>();
     java.util.ArrayList<Bot> allBots = new java.util.ArrayList<>();
     synchronized (bots) {
-      allBots.addAll(bots);
+      liveBots.addAll(bots);
+      allBots.addAll(liveBots);
     }
     synchronized (deadBots) {
       allBots.addAll(deadBots);
@@ -102,27 +138,75 @@ public class BotEngine {
           deadBots.add(bots.remove(i));  // Move to deadBots to preserve trace
           
           // Immediately spawn a replacement bot in a valid location
-          if (autoSpawnEnabled && bots.size() < maxBots) {
+          if (bots.size() < maxBots) {
             spawnRandomBot();
           }
         } else {
           // Update bot with aggregated field force
           float lifeDecay;
           if (luminanceDecayEnabled && backgroundImage != null) {
-            // Luminance-based life decay: bright = slow decay, dark = fast decay
+            // Luminance-based life decay: bright = fast decay, dark = slow decay
             float luminance = getLuminanceAtPosition(bot.getPosition());
-            lifeDecay = 1.0f - luminance;
+            lifeDecay = luminance;
           } else {
             // Normal: lose 1 life per frame
             lifeDecay = 1.0f;
           }
-          bot.update(fieldForce, allBots, lifeDecay);
+          float instability = calculateInstability(bot, liveBots);
+          bot.update(fieldForce, allBots, lifeDecay, instability, driftFor(bot));
         }
       } else {
         // Move dead bots to deadBots list to preserve their traces
         deadBots.add(bots.remove(i));
+        if (bots.size() < maxBots) {
+          spawnRandomBot();
+        }
       }
     }
+  }
+
+  private float calculateInstability(Bot bot, ArrayList<Bot> liveBots) {
+    float fieldVariance = calculateFieldVariance(bot.getPosition(), bot.getRadar());
+    float fieldInstability = Math.min(1.0f,
+      fieldVariance / Config.BOT_STABILITY_FIELD_VARIANCE_THRESHOLD);
+
+    int nearbyBots = 0;
+    float densityRadius = Math.max(bot.getRadar(), Config.CELL_SIZE);
+    for (Bot other : liveBots) {
+      if (other != bot && bot.getPosition().distance(other.getPosition()) <= densityRadius) {
+        nearbyBots++;
+      }
+    }
+    float densityInstability = Math.min(1.0f,
+      (float) nearbyBots / Config.BOT_STABILITY_NEARBY_BOT_THRESHOLD);
+    float curvatureInstability = Math.min(1.0f,
+      bot.getCurvatureVariance() / Config.BOT_STABILITY_CURVATURE_VARIANCE_THRESHOLD);
+    return (fieldInstability + densityInstability + curvatureInstability) / 3.0f;
+  }
+
+  private float calculateFieldVariance(Vector2D center, float radarRadius) {
+    Vector2D[] samples = new Vector2D[radarSamples];
+    Vector2D mean = new Vector2D();
+    float sampleDistance = radarRadius * radarSampleDistance;
+    for (int index = 0; index < radarSamples; index++) {
+      float angle = (float) (2.0 * Math.PI * index / radarSamples);
+      Vector2D sample = vectorField.sample(
+        center.vx + (float) Math.cos(angle) * sampleDistance,
+        center.vy + (float) Math.sin(angle) * sampleDistance);
+      samples[index] = sample;
+      mean.add(sample);
+    }
+    if (samples.length == 0) {
+      return 0.0f;
+    }
+    mean.scale(1.0f / samples.length);
+    float variance = 0.0f;
+    for (Vector2D sample : samples) {
+      float dx = sample.vx - mean.vx;
+      float dy = sample.vy - mean.vy;
+      variance += dx * dx + dy * dy;
+    }
+    return variance / samples.length;
   }
   
   /**
@@ -211,62 +295,7 @@ public class BotEngine {
    * @return Interpolated vector at that position
    */
   private Vector2D sampleFieldBilinear(Vector2D position) {
-    // Get field grid parameters
-    int cols = vectorField.getCols();
-    int rows = vectorField.getRows();
-    float cellSize = vectorField.getCellSize();
-    
-    // Convert world position to grid coordinates
-    float gridX = position.vx / cellSize;
-    float gridY = position.vy / cellSize;
-    
-    // Get integer grid indices
-    int x0 = (int) Math.floor(gridX);
-    int y0 = (int) Math.floor(gridY);
-    int x1 = x0 + 1;
-    int y1 = y0 + 1;
-    
-    // Clamp to grid bounds
-    x0 = Math.max(0, Math.min(x0, cols - 1));
-    x1 = Math.max(0, Math.min(x1, cols - 1));
-    y0 = Math.max(0, Math.min(y0, rows - 1));
-    y1 = Math.max(0, Math.min(y1, rows - 1));
-    
-    // Get fractional parts for interpolation
-    float fx = gridX - (int)gridX;
-    float fy = gridY - (int)gridY;
-    
-    // Clamp fractional parts
-    fx = Math.max(0, Math.min(1, fx));
-    fy = Math.max(0, Math.min(1, fy));
-    
-    // Get 4 surrounding vectors from field
-    Vector2D v00 = vectorField.getVector(x0, y0);
-    Vector2D v10 = vectorField.getVector(x1, y0);
-    Vector2D v01 = vectorField.getVector(x0, y1);
-    Vector2D v11 = vectorField.getVector(x1, y1);
-    
-    // Bilinear interpolation
-    float vx = lerp(
-        lerp(v00.vx, v10.vx, fx),
-        lerp(v01.vx, v11.vx, fx),
-        fy
-    );
-    
-    float vy = lerp(
-        lerp(v00.vy, v10.vy, fx),
-        lerp(v01.vy, v11.vy, fx),
-        fy
-    );
-    
-    return new Vector2D(vx, vy);
-  }
-  
-  /**
-   * Linear interpolation helper
-   */
-  private float lerp(float a, float b, float t) {
-    return a + (b - a) * t;
+    return vectorField.sample(position.vx, position.vy);
   }
   
   /**
@@ -331,6 +360,21 @@ public class BotEngine {
   }
   
   /**
+   * Kill all live bots, keeping their traces as dead bots.
+   */
+  public void killBots() {
+    synchronized (bots) {
+      synchronized (deadBots) {
+        for (Bot bot : bots) {
+          bot.kill();
+          deadBots.add(bot);
+        }
+        bots.clear();
+      }
+    }
+  }
+
+  /**
    * Clear only dead bot traces, keeping live bots.
    */
   public void clearTraces() {
@@ -376,14 +420,29 @@ public class BotEngine {
   // Setters
   public void setBotMaxLife(float life) {
     this.botMaxLife = life;
+    synchronized (bots) {
+      for (Bot bot : bots) {
+        bot.setMaxLife(life);
+      }
+    }
   }
   
   public void setBotRadar(float radar) {
     this.botRadar = radar;
+    synchronized (bots) {
+      for (Bot bot : bots) {
+        bot.setRadar(radar);
+      }
+    }
   }
   
   public void setBotSpeed(float speed) {
     this.botSpeed = speed;
+    synchronized (bots) {
+      for (Bot bot : bots) {
+        bot.setSpeed(speed);
+      }
+    }
   }
   
   public void setRepulsionRadius(float radius) {
@@ -392,6 +451,17 @@ public class BotEngine {
   
   public void setDriftInfluence(float influence) {
     this.driftInfluence = Math.max(0, Math.min(1, influence));
+  }
+
+  public void setDriftMode(String mode) {
+    if ("unique".equals(mode) || "collective".equals(mode) || "canvas".equals(mode)) {
+      driftMode = mode;
+      collectiveDriftCounter = 0;
+    }
+  }
+
+  public String getDriftMode() {
+    return driftMode;
   }
   
   public void setFieldInfluence(float influence) {
@@ -404,6 +474,12 @@ public class BotEngine {
   
   public void setAutoSpawnEnabled(boolean enabled) {
     this.autoSpawnEnabled = enabled;
+    this.spawnFrameCounter = 0;
+  }
+
+  public void setBotSpawnRate(int botsPerSecond) {
+    this.botSpawnRate = Math.max(1, Math.min(Config.DEFAULT_FPS, botsPerSecond));
+    this.spawnFrameCounter = 0;
   }
   
   public void setBotNumber(int number) {
@@ -501,7 +577,8 @@ public class BotEngine {
    * @param samples Number of samples (typically 8-32)
    */
   public void setRadarSamples(int samples) {
-    this.radarSamples = Math.max(1, samples);
+    this.radarSamples = Math.max(Config.MIN_RADAR_SAMPLES,
+      Math.min(Config.MAX_RADAR_SAMPLES, samples));
   }
   
   /**

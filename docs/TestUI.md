@@ -1,0 +1,182 @@
+there would be diferent containers, containign diferent elements, ( tabs, sliders, buttons...)
+thre would be types of containers,
+- tabs
+- icons ribon
+- set of  sliders and  toggle buttons
+- pop up windows 
+
+
+
+From top to bottom, 4 CATEGORIES of containers in terms of content:
+- layer ribbon (tabs type)
+- general layer controls (open/closed eye, unlabeled transparency slider, contextual clear/reset buttons on one line)
+- tools ribbon (icons type)
+- selected tool settings (sliders, toggles, and pop-up windows)
+
+
+
+
+Content breakdown
+- Layer:"BKGD"  background 
+    - General controls: open/closed eye and unlabeled transparency slider on one line
+    - Tools ribon
+        - Tools: colour  ( square of colour icon)
+            - Setting: color picker (pop up window)
+        - Tools: image  ( portrait icon)
+            - Setting: load image ( pop up window)
+- Layer: "VECFD" Vector field  ( includes both tabs porevsusly named field and sketch)
+    - General controls: open/closed eye and unlabeled transparency slider, plus reset action
+    - Tools ribon
+        - tool: paint (brush icon type)
+            - Setting: toggle button ribon
+                -  button : linear
+                -  button : gaussian
+                -  button : hard edge
+            - Setting: 
+                - Slider: size
+                - Slider: hardness
+                - Slider: Strength      
+        - tool: erease (ereaser icon type)
+            - Setting: toggle button ribon
+                -  button : linear
+                -  button : gaussian
+                -  button : hard edge
+            - Setting: 
+                - Slider: size
+                - Slider: hardness
+                - Slider: Strength
+        - tool: Field Actions
+            - Button: Randomize Whole Field
+            - Button: Normalize Whole Field
+    - General action: Reset Vector Field to zero
+
+- Layer: "BOTFD" Bot Field  
+    - General controls: open/closed eye and unlabeled transparency slider, plus clear-bots and clear-traces actions
+    - Tools ribon: 
+        - tool: Place (position  icon type)
+            - Setting: General
+                - Slider: Amount
+                - buton Color picker (popup)
+            - Setting : force balance
+                - Slider: vectorfield
+                - Slider: Repulsion
+                - Slider: Drifting    
+            - Setting: Life
+                - Slider: Duration
+                - Slider: Velocityu
+                - Slider: Illuminance decay    
+            - Setting: Field Radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength 
+            - Setting: Repulsion radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength (samples)
+            - Setting: Drifting 
+                - Toggle: Unique /colective / canvas
+                - Slider: velocity
+                - Slider: Strength 
+        - tool: random (random  icon type)
+            - Setting: General
+                - Slider: Amount
+                - buton Color picker (popup)
+            - Setting : force balance
+                - Slider: vectorfield
+                - Slider: Repulsion
+                - Slider: Drifting    
+            - Setting: Life
+                - Slider: Duration
+                - Slider: Velocityu
+                - Slider: Illuminance decay    
+            - Setting: Field Radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength 
+            - Setting: Repulsion radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength (samples)
+            - Setting: Drifting 
+                - Toggle: Unique /colective / canvas
+                - Slider: velocity
+                - Slider: Strength 
+            - Setting : force balance
+                - Slider: vectorfield
+                - Slider: Repulsion
+                - Slider: Drifting    
+            - Setting: Life
+                - Slider: Duration
+                - Slider: Velocityu
+                - Slider: Illuminance decay    
+            - Setting: Field Radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength 
+            - Setting: Repulsion radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength (samples)
+            - Setting: Drifting 
+                - Toggle: Unique /colective / canvas
+                - Slider: velocity
+                - Slider: Strength 
+        - tool: Auto (Auto  icon type)
+            - Setting: toggle button ribon
+                -  button : play
+                -  button : stop
+            - Setting: General
+                - Slider: Amount
+                - buton Color picker (popup)
+            - Setting : force balance
+                - Slider: vectorfield
+                - Slider: Repulsion
+                - Slider: Drifting    
+            - Setting: Life
+                - Slider: Duration
+                - Slider: Velocityu
+                - Slider: Illuminance decay    
+            - Setting: Field Radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength 
+            - Setting: Repulsion radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength (samples)
+            - Setting: Drifting 
+                - Toggle: Unique /colective / canvas
+                - Slider: velocity
+                - Slider: Strength 
+            - Setting : force balance
+                - Slider: vectorfield
+                - Slider: Repulsion
+                - Slider: Drifting    
+            - Setting: Life
+                - Slider: Duration
+                - Slider: Velocityu
+                - Slider: Illuminance decay    
+            - Setting: Field Radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength 
+            - Setting: Repulsion radar
+                - Toggle: linear /gaussian/hardedge
+                - Slider: Radio
+                - Slider: Hardness (center weight)
+                - Slider: Strength (samples)
+            - Setting: Drifting 
+                - Toggle: Unique /colective / canvas
+                - Slider: velocity
+                - Slider: Strength 
+        - tool: clear (X  icon type)
+        - tool: export

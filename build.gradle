@@ -19,3 +19,21 @@ java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
 }
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 11
+}
+
+tasks.named('test') {
+    failOnNoDiscoveredTests = false
+}
+
+tasks.register('logicChecks', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'FlowDrawingLogicChecks'
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('logicChecks')
+}

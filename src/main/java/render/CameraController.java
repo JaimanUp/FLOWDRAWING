@@ -51,6 +51,22 @@ public class CameraController {
   public void setZoom(float level) {
     zoomLevel = Math.max(0.1f, Math.min(10.0f, level));
   }
+
+  public boolean fitToViewport(int viewportWidth, int viewportHeight, float margin) {
+    if (viewportWidth <= 0 || viewportHeight <= 0
+        || canvasWidth <= 0 || canvasHeight <= 0
+        || margin <= 0.0f || margin > 1.0f) {
+      return false;
+    }
+
+    float fitZoom = Math.min(
+      viewportWidth / (float) canvasWidth,
+      viewportHeight / (float) canvasHeight) * margin;
+    setZoom(fitZoom);
+    panX = (viewportWidth - canvasWidth) * zoomLevel / 2.0f;
+    panY = (viewportHeight - canvasHeight) * zoomLevel / 2.0f;
+    return true;
+  }
   
   /**
    * Zoom centered on a specific mouse position in screen space.

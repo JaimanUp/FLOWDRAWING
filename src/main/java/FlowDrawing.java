@@ -3,6 +3,7 @@ import java.awt.*;
 import java.awt.event.*;
 import field.VectorField;
 import brush.Brush;
+import config.Config;
 
 /**
  * Flow-Guided Generative Drawing Engine
@@ -18,10 +19,6 @@ public class FlowDrawing extends JFrame {
   private ui.ToolPanel toolPanel;
   private JLabel statusBar;
   
-  // Fixed canvas dimensions (larger than typical window for painting flexibility)
-  private static final int CANVAS_WIDTH = 2000;
-  private static final int CANVAS_HEIGHT = 2000;
-  
   // Trace color oscillation
   private static final java.awt.Color TRACE_COLOR_1 = new java.awt.Color(0x379439);  // #379439 greenish
   private static final java.awt.Color TRACE_COLOR_2 = new java.awt.Color(0x6B4D34);  // #6B4D34 brownish
@@ -35,9 +32,6 @@ public class FlowDrawing extends JFrame {
     setTitle("FlowDrawing");
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     setResizable(true);
-
-    // Create canvas panel
-    canvasPanel = new CanvasPanel(CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // ── Menu bar ───────────────────────────────────────────────────────
     setJMenuBar(new ui.AppMenuBar(new ui.AppMenuBar.MenuListener() {
@@ -55,12 +49,20 @@ public class FlowDrawing extends JFrame {
         }
       }
       @Override public void onExit() { System.exit(0); }
+      @Override public void onExportSvg() { exportVectorDrawing("svg"); }
+      @Override public void onExportDxf() { exportVectorDrawing("dxf"); }
+      @Override public void onExportPng() { exportRasterImage("png"); }
+      @Override public void onExportJpg() { exportRasterImage("jpg"); }
       @Override public void onResetView() { canvasPanel.resetCanvasToFit(); setStatus("View reset"); }
       @Override public void onZoomIn()   { canvasPanel.zoomBy(1.2f); }
       @Override public void onZoomOut()  { canvasPanel.zoomBy(0.8f); }
       @Override public void onFitCanvas() { canvasPanel.resetCanvasToFit(); setStatus("Fit canvas"); }
       @Override public void onToggleToolPanel() {
         toolPanel.setVisible(!toolPanel.isVisible());
+      }
+      @Override public void onVisualizationModeChanged(String mode) {
+        canvasPanel.setVisualizationMode(mode);
+        setStatus("Vector field display: " + ("flowmap".equals(mode) ? "Flow Map" : "Arrows"));
       }
     }));
 
@@ -73,8 +75,20 @@ public class FlowDrawing extends JFrame {
         canvasPanel.getLayerRenderer().setShowBackground(show);
         setStatus(show ? "Background ON" : "Background OFF"); 
       }
-      @Override public void onBackgroundTransparencyChanged(float a)  { setStatus("[planned] Background transparency"); }
-      @Override public void onBackgroundColorPicker()                 { setStatus("[planned] Background colour picker"); }
+      @Override public void onBackgroundTransparencyChanged(float a) {
+        canvasPanel.getLayerRenderer().setBackgroundTransparency(a);
+        canvasPanel.repaint();
+      }
+      @Override public void onBackgroundColorPicker() {
+        render.LayerRenderer renderer = canvasPanel.getLayerRenderer();
+        Color selectedColor = JColorChooser.showDialog(
+          frame, "Choose Background Color", renderer.getBackgroundColor());
+        if (selectedColor != null) {
+          renderer.setBackgroundColor(selectedColor);
+          canvasPanel.getBotEngine().setBackgroundImage(renderer.getBackgroundForSimulation());
+          setStatus("Background color updated");
+        }
+      }
       @Override public void onLoadBackgroundImage() {
         javax.swing.JFileChooser fc = new javax.swing.JFileChooser();
         fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Image Files", "png", "jpg", "jpeg", "bmp", "gif"));
@@ -83,7 +97,8 @@ public class FlowDrawing extends JFrame {
           try {
             java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(fc.getSelectedFile());
             canvasPanel.getLayerRenderer().setBackgroundImage(img);
-            canvasPanel.getBotEngine().setBackgroundImage(img);
+            canvasPanel.getBotEngine().setBackgroundImage(
+              canvasPanel.getLayerRenderer().getBackgroundForSimulation());
             setStatus("Background image loaded: " + fc.getSelectedFile().getName());
           } catch (Exception ex) {
             setStatus("Error loading image: " + ex.getMessage());
@@ -92,7 +107,8 @@ public class FlowDrawing extends JFrame {
       }
       @Override public void onClearBackgroundImage() {
         canvasPanel.getLayerRenderer().clearBackgroundImage();
-        canvasPanel.getBotEngine().setBackgroundImage(null);
+        canvasPanel.getBotEngine().setBackgroundImage(
+          canvasPanel.getLayerRenderer().getBackgroundForSimulation());
         setStatus("Background image cleared");
       }
 
@@ -101,7 +117,14 @@ public class FlowDrawing extends JFrame {
         canvasPanel.setShowVectorField(show);
         setStatus(show ? "Vector field ON" : "Vector field OFF");
       }
-      @Override public void onVectorFieldTransparencyChanged(float a) { setStatus("[planned] Field transparency"); }
+      @Override public void onVectorFieldTransparencyChanged(float a) {
+        canvasPanel.getLayerRenderer().setVectorFieldTransparency(a);
+        canvasPanel.repaint();
+      }
+      @Override public void onFieldMagnitudeScaleChanged(float scale) {
+        canvasPanel.getVectorField().setFieldMagnitudeScale(scale);
+        canvasPanel.repaint();
+      }
       @Override public void onVisualizationModeChanged(String mode) {
         canvasPanel.setVisualizationMode(mode.equals("heatmap") ? "flowmap" : mode);
         setStatus(mode.equals("heatmap") ? "Heatmap mode" : "Arrow mode");
@@ -113,6 +136,17 @@ public class FlowDrawing extends JFrame {
       @Override public void onRandomVectorField() {
         canvasPanel.randomizeVectorField();
         setStatus("Vector field randomized");
+      }
+      @Override public void onCleanVectorField() {
+        canvasPanel.getVectorField().normalizeVectors();
+        canvasPanel.repaint();
+        setStatus("Vector field normalized");
+      }
+      @Override public void onFieldDrawingEnabled(boolean enabled) {
+        if (canvasPanel != null) canvasPanel.setFieldDrawingEnabled(enabled);
+      }
+      @Override public void onBotPlacementEnabled(boolean enabled) {
+        if (canvasPanel != null) canvasPanel.setBotPlacementEnabled(enabled);
       }
 
       // Sketch
@@ -129,6 +163,11 @@ public class FlowDrawing extends JFrame {
       @Override public void onBrushSizeChanged(float size)            { canvasPanel.getBrush().setSize(size); }
       @Override public void onBrushHardnessChanged(float hardness)    { canvasPanel.getBrush().setHardness(hardness); }
       @Override public void onBrushStrengthChanged(float strength)    { canvasPanel.getBrush().setStrength(strength); }
+      @Override public void onBrushFalloffChanged(String falloffType) {
+        canvasPanel.getBrush().setFalloffType(
+          field.VectorField.FalloffType.valueOf(falloffType.toUpperCase().replace(" ", "_")));
+        setStatus("Brush falloff: " + falloffType);
+      }
       @Override public void onClearSketch() {
         canvasPanel.clearStrokes();
         setStatus("Strokes cleared");
@@ -144,12 +183,22 @@ public class FlowDrawing extends JFrame {
       @Override public void onBotRadarChanged(float radar)            { canvasPanel.getBotEngine().setBotRadar(radar); }
       @Override public void onBotSpeedChanged(float speed)            { canvasPanel.getBotEngine().setBotSpeed(speed); }
       @Override public void onBotDriftInfluenceChanged(float influence)     { canvasPanel.getBotEngine().setDriftInfluence(influence); }
+            @Override public void onBotDriftModeChanged(String mode) {
+              canvasPanel.getBotEngine().setDriftMode(mode);
+              setStatus("Drift mode: " + mode);
+            }
       @Override public void onBotFieldInfluenceChanged(float influence)     { canvasPanel.getBotEngine().setFieldInfluence(influence); }
       @Override public void onBotRepulsionInfluenceChanged(float influence) { canvasPanel.getBotEngine().setRepulsionInfluence(influence); }
       @Override public void onBotRepulsionRadiusChanged(float radius) { canvasPanel.getBotEngine().setRepulsionRadius(radius); }
       @Override public void onSpawnBot() {
+        canvasPanel.getBotEngine().spawnBotAt(canvasPanel.canvasWidth / 2.0f, canvasPanel.canvasHeight / 2.0f);
+        canvasPanel.repaint();
+        setStatus("Bot placed at canvas center");
+      }
+      @Override public void onSpawnRandomBots() {
         canvasPanel.getBotEngine().spawnMultipleBots();
-        setStatus("Bots spawned (x" + canvasPanel.getBotEngine().getBotNumber() + ")");
+        canvasPanel.repaint();
+        setStatus("Random bots spawned (x" + canvasPanel.getBotEngine().getBotNumber() + ")");
       }
       @Override public void onAutoSpawnToggle(boolean enabled) {
         canvasPanel.getBotEngine().setAutoSpawnEnabled(enabled);
@@ -159,10 +208,14 @@ public class FlowDrawing extends JFrame {
         canvasPanel.getBotEngine().setBotNumber(number);
         setStatus("Bot number set to: " + number);
       }
+      @Override public void onBotSpawnRateChanged(int botsPerSecond) {
+        canvasPanel.getBotEngine().setBotSpawnRate(botsPerSecond);
+        setStatus("Bot spawn rate: " + botsPerSecond + "/s");
+      }
       @Override public void onClearBots() {
-        canvasPanel.clearBots();
+        canvasPanel.getBotEngine().killBots();
         toolPanel.updateSimulationState(canvasPanel.getBotEngine().isSimulationRunning());
-        setStatus("Bots cleared");
+        setStatus("Bots killed — traces kept");
       }
       @Override public void onSimulationToggle() {
         boolean nowRunning = canvasPanel.getBotEngine().toggleSimulation();
@@ -188,6 +241,29 @@ public class FlowDrawing extends JFrame {
       @Override public void onBotTraceFadeToggle(boolean enabled) {
         canvasPanel.setTraceFadeEnabled(enabled);
         setStatus(enabled ? "Trace fade ON" : "Trace fade OFF");
+      }
+      @Override public void onBotRepresentationChanged(String representation) {
+        canvasPanel.setBotRepresentation(representation);
+        setStatus("Bot representation: " + representation);
+      }
+      @Override public void onBotColorModeChanged(String mode) {
+        canvasPanel.setBotColorMode(mode);
+        setStatus("Trace color mode: " + mode);
+      }
+      @Override public void onBotColorPicker() {
+        Color selectedColor = JColorChooser.showDialog(
+          frame, "Choose Trace Base Color", canvasPanel.getBotBaseColor());
+        if (selectedColor != null) {
+          canvasPanel.setBotBaseColor(selectedColor);
+          setStatus("Trace base color updated");
+        }
+      }
+      @Override public void onExportRequested(String format) {
+        if ("svg".equals(format) || "dxf".equals(format)) {
+          exportVectorDrawing(format);
+        } else {
+          exportRasterImage(format);
+        }
       }
       
       // Radar sampling methods
@@ -218,6 +294,16 @@ public class FlowDrawing extends JFrame {
       }
     });
 
+    // Create the logical canvas after the toolbar exists so its width is included in the aspect ratio.
+    Rectangle usableScreen = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+    Insets frameInsets = getInsets();
+    int viewportWidth = usableScreen.width - toolPanel.getPreferredSize().width
+      - frameInsets.left - frameInsets.right;
+    int viewportHeight = usableScreen.height - getJMenuBar().getPreferredSize().height
+      - 20 - frameInsets.top - frameInsets.bottom;
+    Dimension canvasSize = Config.canvasSizeForViewport(viewportWidth, viewportHeight);
+    canvasPanel = new CanvasPanel(canvasSize.width, canvasSize.height);
+
     // ── Status bar ─────────────────────────────────────────────────────
     statusBar = new JLabel("  Ready");
     statusBar.setFont(new Font("Arial", Font.PLAIN, 11));
@@ -234,16 +320,109 @@ public class FlowDrawing extends JFrame {
     add(canvasPanel, BorderLayout.CENTER);
     add(statusBar,   BorderLayout.SOUTH);
 
+    addWindowListener(new WindowAdapter() {
+      @Override
+      public void windowOpened(WindowEvent event) {
+        SwingUtilities.invokeLater(() -> {
+          canvasPanel.resetCanvasToFit();
+          canvasPanel.requestFocusInWindow();
+        });
+      }
+    });
     setExtendedState(JFrame.MAXIMIZED_BOTH);
     setVisible(true);
-    
-    // Fit canvas to screen on startup and request focus
-    canvasPanel.resetCanvasToFit();
-    canvasPanel.requestFocusInWindow();
   }
 
   private void setStatus(String msg) {
     if (statusBar != null) statusBar.setText("  " + msg);
+  }
+
+  private java.nio.file.Path chooseExportPath(String extension) {
+    javax.swing.JFileChooser chooser = new javax.swing.JFileChooser();
+    chooser.setDialogTitle("Export as " + extension.toUpperCase());
+    chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+      extension.toUpperCase() + " files", extension));
+    chooser.setSelectedFile(new java.io.File("flowdrawing." + extension));
+    if (chooser.showSaveDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) {
+      return null;
+    }
+
+    java.io.File selected = chooser.getSelectedFile();
+    if (!selected.getName().toLowerCase(java.util.Locale.ROOT).endsWith("." + extension)) {
+      selected = new java.io.File(selected.getParentFile(), selected.getName() + "." + extension);
+    }
+    if (selected.exists() && JOptionPane.showConfirmDialog(this,
+        "Replace the existing file?", "Confirm Export", JOptionPane.YES_NO_OPTION)
+        != JOptionPane.YES_OPTION) {
+      return null;
+    }
+    return selected.toPath();
+  }
+
+  private void exportVectorDrawing(String format) {
+    java.nio.file.Path target = chooseExportPath(format);
+    if (target == null) {
+      return;
+    }
+    float epsilon = chooseOptimizationEpsilon();
+    if (epsilon < 0.0f) {
+      return;
+    }
+    try {
+      java.util.List<java.util.List<field.Vector2D>> paths = canvasPanel.copyBotPaths();
+      if (epsilon > 0.0f) {
+        paths = optimization.PathOptimizer.simplifyPaths(paths, epsilon);
+        paths = optimization.PathOptimizer.orderNearestNeighbor(paths);
+      }
+      if ("svg".equals(format)) {
+        export.DrawingExporter.writeSvg(target, paths, canvasPanel.canvasWidth, canvasPanel.canvasHeight);
+      } else {
+        export.DrawingExporter.writeDxf(target, paths);
+      }
+      setStatus("Exported " + target.getFileName());
+    } catch (java.io.IOException exception) {
+      setStatus("Export failed: " + exception.getMessage());
+      JOptionPane.showMessageDialog(this, exception.getMessage(), "Export Failed", JOptionPane.ERROR_MESSAGE);
+    }
+  }
+
+  private float chooseOptimizationEpsilon() {
+    JCheckBox optimize = new JCheckBox("Reduce points and order paths", false);
+    JSlider epsilon = new JSlider(1, 10, 2);
+    epsilon.setEnabled(false);
+    JLabel epsilonLabel = new JLabel("Tolerance: " + epsilon.getValue() + " px");
+    epsilon.setMajorTickSpacing(1);
+    epsilon.setPaintTicks(true);
+    epsilon.addChangeListener(event -> epsilonLabel.setText("Tolerance: " + epsilon.getValue() + " px"));
+    optimize.addActionListener(event -> {
+      epsilon.setEnabled(optimize.isSelected());
+      epsilonLabel.setEnabled(optimize.isSelected());
+    });
+
+    JPanel options = new JPanel(new BorderLayout(0, 6));
+    options.add(optimize, BorderLayout.NORTH);
+    options.add(epsilonLabel, BorderLayout.CENTER);
+    options.add(epsilon, BorderLayout.SOUTH);
+    int result = JOptionPane.showConfirmDialog(
+      this, options, "Vector Export Options", JOptionPane.OK_CANCEL_OPTION);
+    if (result != JOptionPane.OK_OPTION) {
+      return -1.0f;
+    }
+    return optimize.isSelected() ? epsilon.getValue() : 0.0f;
+  }
+
+  private void exportRasterImage(String format) {
+    java.nio.file.Path target = chooseExportPath(format);
+    if (target == null) {
+      return;
+    }
+    try {
+      export.DrawingExporter.writeRaster(target, canvasPanel.createCanvasImage(), format);
+      setStatus("Exported " + target.getFileName());
+    } catch (java.io.IOException exception) {
+      setStatus("Export failed: " + exception.getMessage());
+      JOptionPane.showMessageDialog(this, exception.getMessage(), "Export Failed", JOptionPane.ERROR_MESSAGE);
+    }
   }
 
   // Inner class for canvas rendering
@@ -264,6 +443,8 @@ public class FlowDrawing extends JFrame {
     private brush.Brush brush;
     private brush.BrushEngine brushEngine;
     private volatile boolean leftMousePressed = false;
+    private volatile boolean fieldDrawingEnabled = true;
+    private volatile boolean botPlacementEnabled = false;
     
     // Phase 5: Bot simulation
     private bot.BotEngine botEngine;
@@ -273,6 +454,9 @@ public class FlowDrawing extends JFrame {
     private float lastModulatedSize = 0;  // Track previous brush size for interpolation
     private boolean traceFadeEnabled = true;  // Toggle for bot trace fade out effect
     private float botTransparency = 1.0f;  // Bot layer transparency (0.0-1.0)
+    private String botRepresentation = "circle";
+      private String botColorMode = "palette";
+      private java.awt.Color botBaseColor = TRACE_COLOR_1;
     private long frameCount = 0;  // Frame counter for oscillating trace color
 
     private String visualizationMode = "arrow";
@@ -287,7 +471,6 @@ public class FlowDrawing extends JFrame {
       setPreferredSize(new Dimension(width, height));
       setOpaque(false);  // Make transparent so super.paintComponent doesn't paint white background
       setFocusable(true);
-      setFocusTraversalKeysEnabled(false);  // Allow all key events
 
       // Initialize managers
       cameraController = new render.CameraController(width, height);
@@ -302,6 +485,7 @@ public class FlowDrawing extends JFrame {
       
       // Phase 5: Initialize bot engine
       botEngine = new bot.BotEngine(canvasManager.getVectorField());
+      botEngine.setBackgroundImage(layerRenderer.getBackgroundForSimulation());
 
       // Request focus when component is clicked
       addMouseListener(new MouseAdapter() {
@@ -324,16 +508,22 @@ public class FlowDrawing extends JFrame {
           }
           // Detect left mouse button for painting
           else if (e.getButton() == MouseEvent.BUTTON1) {
-            leftMousePressed = true;
-            // Start brush stroke with world coordinates
-            java.awt.geom.Point2D.Float worldCoords = cameraController.screenToWorld(
-              e.getX(), e.getY(), getWidth(), getHeight()
-            );
-            brushEngine.startStroke(worldCoords.x, worldCoords.y);
-            // Reset stroke tracking for polyline
-            lastStrokeX = Float.NaN;
-            lastStrokeY = Float.NaN;
-            lastModulatedSize = 0;
+            if (botPlacementEnabled) {
+              java.awt.geom.Point2D.Float worldCoords = cameraController.screenToWorld(
+                e.getX(), e.getY(), getWidth(), getHeight()
+              );
+              botEngine.spawnBotAt(worldCoords.x, worldCoords.y);
+              repaint();
+            } else if (fieldDrawingEnabled) {
+              leftMousePressed = true;
+              java.awt.geom.Point2D.Float worldCoords = cameraController.screenToWorld(
+                e.getX(), e.getY(), getWidth(), getHeight()
+              );
+              brushEngine.startStroke(worldCoords.x, worldCoords.y);
+              lastStrokeX = Float.NaN;
+              lastStrokeY = Float.NaN;
+              lastModulatedSize = 0;
+            }
           }
         }
 
@@ -494,8 +684,43 @@ public class FlowDrawing extends JFrame {
     @Override
     public void run() {
       while (running) {
+        try {
+          renderFrame();
+        } catch (RuntimeException exception) {
+          // Keep the animation alive; report each distinct error once instead of every frame
+          reportFrameError(exception);
+        }
+        try {
+          Thread.sleep(16); // ~60 FPS
+        } catch (InterruptedException e) {
+          break;
+        }
+      }
+    }
+
+    private String lastFrameError;
+
+    private void reportFrameError(RuntimeException exception) {
+      StackTraceElement[] trace = exception.getStackTrace();
+      String signature = exception.getClass().getName() + "@" + (trace.length > 0 ? trace[0] : "?");
+      if (signature.equals(lastFrameError)) {
+        return;
+      }
+      lastFrameError = signature;
+      System.err.println("Animation frame " + frameCount + " failed:");
+      exception.printStackTrace();
+      FlowDrawing parent = getParentFrame();
+      if (parent != null) {
+        String message = "Animation error: " + exception.getClass().getSimpleName()
+          + (exception.getMessage() != null ? " - " + exception.getMessage() : "")
+          + " (details in console)";
+        SwingUtilities.invokeLater(() -> parent.setStatus(message));
+      }
+    }
+
+    private void renderFrame() {
         frameCount++;  // Increment frame counter
-        
+
         // Note: Canvas size (1200x800) remains FIXED
         // Only update viewport dimensions for rendering (window may be resized)
         int currentWidth = getWidth();
@@ -506,13 +731,18 @@ public class FlowDrawing extends JFrame {
         
         // Calculate oscillating color based on frame count (3000 frame cycle)
         java.awt.Color oscillatingColor = calculateOscillatingColor(frameCount);
+        java.awt.Color traceColor = "palette".equals(botColorMode)
+          ? oscillatingColor : botBaseColor;
         
         // Phase 5: Update bots
         // Set trace transparency and color on all bots before update
         synchronized (botEngine.getBots()) {
           for (bot.Bot bot : botEngine.getBots()) {
             bot.setTraceTransparency(botTransparency);
-            bot.setTraceColor(oscillatingColor);
+            float lifeOpacity = "life".equals(botColorMode) ? bot.getLifeNormalized() : 1.0f;
+            bot.setTraceTransparency(botTransparency * lifeOpacity);
+            bot.setTraceColor(traceColor);
+            bot.setColor(traceColor);
           }
         }
         botEngine.update();
@@ -529,12 +759,6 @@ public class FlowDrawing extends JFrame {
         }
         
         repaint();
-        try {
-          Thread.sleep(16); // ~60 FPS
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
     }
     
     public void resetCanvas() {
@@ -556,38 +780,9 @@ public class FlowDrawing extends JFrame {
     public void resetCanvasToFit() {
       int panelWidth = getWidth();
       int panelHeight = getHeight();
-      
-      // Determine reference length based on screen orientation
-      // Vertical: use full height
-      // Horizontal: use width (which already excludes sidebar since we're in BorderLayout.CENTER)
-      float refLength;
-      if (panelHeight >= panelWidth) {
-        // Vertical or square screen: use height as reference
-        refLength = panelHeight;
-      } else {
-        // Horizontal screen: use width as reference
-        refLength = panelWidth;
-      }
-      
-      // Calculate zoom so canvas dimension equals reference length
-      float canvasDim = Math.max(CANVAS_WIDTH, CANVAS_HEIGHT);
-      float fitZoom = (refLength / canvasDim) * 0.95f;  // 95% margin
-      
-      // Calculate centers
-      float panelCenterX = panelWidth / 2.0f;
-      float panelCenterY = panelHeight / 2.0f;
-      
-      float canvasCenterX = CANVAS_WIDTH / 2.0f;
-      float canvasCenterY = CANVAS_HEIGHT / 2.0f;
-      
-      // Pan to center the canvas
-      float panX = panelCenterX - (canvasCenterX * fitZoom);
-      float panY = panelCenterY - (canvasCenterY * fitZoom);
-      
-      // Apply camera settings
+      if (panelWidth <= 0 || panelHeight <= 0) return;
       cameraController.reset();
-      cameraController.setZoom(fitZoom);
-      cameraController.setPan(panX, panY);
+      if (!cameraController.fitToViewport(panelWidth, panelHeight, 0.95f)) return;
       
       // Clear temporary data but preserve vector field
       layerRenderer.resetBackground();
@@ -633,11 +828,42 @@ public class FlowDrawing extends JFrame {
       botTransparency = Math.max(0.0f, Math.min(1.0f, transparency));
       repaint();
     }
+
+    public void setBotRepresentation(String representation) {
+      if ("point".equals(representation) || "circle".equals(representation)
+          || "triangle".equals(representation)) {
+        botRepresentation = representation;
+        repaint();
+      }
+    }
+
+    public java.awt.Color getBotBaseColor() {
+      return botBaseColor;
+    }
+
+    public void setBotBaseColor(java.awt.Color color) {
+      if (color != null) {
+        botBaseColor = color;
+        repaint();
+      }
+    }
     
     public void setVisualizationMode(String mode) {
       this.visualizationMode = mode;
       layerRenderer.setVisualizationMode(mode);
       repaint();
+    }
+
+    public void setFieldDrawingEnabled(boolean enabled) {
+      fieldDrawingEnabled = enabled;
+    }
+
+    public void setBotPlacementEnabled(boolean enabled) {
+      botPlacementEnabled = enabled;
+    }
+
+    public field.VectorField getVectorField() {
+      return canvasManager.getVectorField();
     }
     
     // Phase 4: Brush accessors
@@ -657,6 +883,42 @@ public class FlowDrawing extends JFrame {
     // Layer renderer accessor for background image management
     public render.LayerRenderer getLayerRenderer() {
       return layerRenderer;
+    }
+    
+    public synchronized java.awt.image.BufferedImage createCanvasImage() {
+      java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
+        canvasWidth, canvasHeight, java.awt.image.BufferedImage.TYPE_INT_RGB);
+      java.awt.Graphics2D graphics = image.createGraphics();
+      layerRenderer.render(graphics, canvasWidth, canvasHeight, null);
+      graphics.dispose();
+      return image;
+    }
+    
+    public java.util.List<java.util.List<field.Vector2D>> copyBotPaths() {
+      java.util.ArrayList<bot.Bot> allBots = new java.util.ArrayList<>();
+      synchronized (botEngine.getBots()) {
+        allBots.addAll(botEngine.getBots());
+      }
+      synchronized (botEngine.getDeadBots()) {
+        allBots.addAll(botEngine.getDeadBots());
+      }
+      
+      java.util.List<java.util.List<field.Vector2D>> paths = new java.util.ArrayList<>();
+      for (bot.Bot bot : allBots) {
+        java.util.ArrayList<bot.Bot.TracePoint> trace = bot.getPath();
+        java.util.List<field.Vector2D> path = new java.util.ArrayList<>();
+        synchronized (trace) {
+          for (bot.Bot.TracePoint point : trace) {
+            if (point != null && point.position != null) {
+              path.add(point.position.copy());
+            }
+          }
+        }
+        if (!path.isEmpty()) {
+          paths.add(path);
+        }
+      }
+      return paths;
     }
     
     // Get the parent FlowDrawing frame for accessing toolPanel
@@ -680,16 +942,7 @@ public class FlowDrawing extends JFrame {
     // Randomize the vector field with noise-like values
     public void randomizeVectorField() {
       field.VectorField vf = canvasManager.getVectorField();
-      int cols = vf.getCols();
-      int rows = vf.getRows();
-      vf.clear();
-      for (int x = 0; x < cols; x++) {
-        for (int y = 0; y < rows; y++) {
-          double angle = Math.random() * 2 * Math.PI;
-          float strength = 0.5f + (float)(Math.random() * 2.0f);
-          vf.addForce(x, y, (float)(Math.cos(angle) * strength), (float)(Math.sin(angle) * strength));
-        }
-      }
+      vf.randomize();
       repaint();
     }
     
@@ -705,7 +958,7 @@ public class FlowDrawing extends JFrame {
      * @return The interpolated color for this frame
      */
     private java.awt.Color calculateOscillatingColor(long frameCount) {
-      final long OSCILLATION_FRAMES = 3000;
+        final long OSCILLATION_FRAMES = 120;
       float phase = (float) ((frameCount % OSCILLATION_FRAMES) / (double) OSCILLATION_FRAMES);
       float oscillation = (float) Math.sin(phase * Math.PI * 2);  // -1 to 1
       float t = (oscillation + 1.0f) * 0.5f;  // Convert to 0-1 range
@@ -716,6 +969,12 @@ public class FlowDrawing extends JFrame {
       int b = (int) (TRACE_COLOR_1.getBlue() * (1 - t) + TRACE_COLOR_2.getBlue() * t);
       
       return new java.awt.Color(r, g, b);
+    }
+
+    public void setBotColorMode(String mode) {
+      if ("constant".equals(mode) || "life".equals(mode) || "palette".equals(mode)) {
+        botColorMode = mode;
+      }
     }
     
     /**
@@ -747,7 +1006,7 @@ public class FlowDrawing extends JFrame {
       return new java.awt.Color(r, g, b);
     }
     
-    private void drawBots() {
+    private synchronized void drawBots() {
       java.awt.Graphics2D g2d = layerRenderer.getBotGraphics();
       
       // Clear bot layer each frame so traces don't accumulate and transparency works correctly
@@ -817,7 +1076,6 @@ public class FlowDrawing extends JFrame {
       
       // Draw only live bots as circles with direction indicators (not dead ones)
       for (bot.Bot bot : botsCopy) {
-        // Draw bot as small circle at current position
         field.Vector2D pos = bot.getPosition();
         float life = bot.getLifeNormalized();
         java.awt.Color botColor = bot.getColor();
@@ -828,12 +1086,31 @@ public class FlowDrawing extends JFrame {
         int alpha = (int) ((200 + 55 * life) * botTransparency);
         
         g2d.setColor(new Color(r, g_val, b, alpha));
-        g2d.fillOval((int) pos.vx - radius, (int) pos.vy - radius, radius * 2, radius * 2);
-        
-        // Draw direction indicator (small line from center)
         field.Vector2D vel = bot.getVelocity();
         float velMag = vel.magnitude();
-        if (velMag > 0.1f) {
+        if ("point".equals(botRepresentation)) {
+          g2d.fillRect((int) pos.vx - 1, (int) pos.vy - 1, 3, 3);
+        } else if ("triangle".equals(botRepresentation) && velMag > 0.1f) {
+          float directionX = vel.vx / velMag;
+          float directionY = vel.vy / velMag;
+          float perpendicularX = -directionY;
+          float perpendicularY = directionX;
+          int[] xPoints = {
+            Math.round(pos.vx + directionX * 6.0f),
+            Math.round(pos.vx - directionX * 4.0f + perpendicularX * 3.5f),
+            Math.round(pos.vx - directionX * 4.0f - perpendicularX * 3.5f)
+          };
+          int[] yPoints = {
+            Math.round(pos.vy + directionY * 6.0f),
+            Math.round(pos.vy - directionY * 4.0f + perpendicularY * 3.5f),
+            Math.round(pos.vy - directionY * 4.0f - perpendicularY * 3.5f)
+          };
+          g2d.fillPolygon(xPoints, yPoints, 3);
+        } else {
+          g2d.fillOval((int) pos.vx - radius, (int) pos.vy - radius, radius * 2, radius * 2);
+        }
+
+        if (!"triangle".equals(botRepresentation) && velMag > 0.1f) {
           int dirAlpha = (int) (150 * botTransparency);
           g2d.setColor(new Color(r, g_val, b, dirAlpha));
           float dirScale = 5.0f;

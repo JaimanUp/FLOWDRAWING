@@ -17,6 +17,7 @@ public class BrushEngine {
   private Brush brush;
   private VectorField field;
   private float lastPaintX, lastPaintY;
+  private float distanceSinceLastDab;
   private boolean isPainting = false;
   
   public BrushEngine(Brush brush, VectorField field) {
@@ -33,6 +34,8 @@ public class BrushEngine {
     isPainting = true;
     lastPaintX = x;
     lastPaintY = y;
+    distanceSinceLastDab = 0.0f;
+    applyDab(x, y, 1.0f, 0.0f);
   }
   
   /**
@@ -45,59 +48,43 @@ public class BrushEngine {
   public boolean paintAt(float x, float y) {
     if (!isPainting) return false;
     
-    // Calculate distance from last paint position
     float dx = x - lastPaintX;
     float dy = y - lastPaintY;
     float distance = (float) Math.sqrt(dx * dx + dy * dy);
-    
-    // Apply if distance exceeds spacing threshold
-    if (distance >= brush.getSpacing()) {
-      // Calculate force direction from movement (or use strength for eraser)
-      float forceX = 0, forceY = 0;
-      
-      if (brush.getMode() == Brush.BrushMode.BRUSH) {
-        // BRUSH mode: add forces based on mouse delta direction, scaled by velocity
-        if (distance > 0) {
-          // Force magnitude scales with mouse velocity (distance between samples)
-          // Capped to prevent extreme forces from fast mouse movements
-          float velocityScale = Math.min(distance / brush.getSpacing(), 10.0f);
-          forceX = (dx / distance) * brush.getStrength() * velocityScale;
-          forceY = (dy / distance) * brush.getStrength() * velocityScale;
-        }
-      } else {
-        // ERASER mode: subtract forces uniformly, moving vectors toward zero
-        forceX = -brush.getStrength();
-        forceY = -brush.getStrength();
-      }
-      
-      // Apply force to field with falloff
-      if (brush.getMode() == Brush.BrushMode.BRUSH) {
-        field.addForceWithFalloff(
-          x, y,
-          brush.getSize(),
-          forceX,
-          forceY,
-          brush.getEffectiveFalloffType()
-        );
-      } else {
-        // For eraser, use the same falloff mechanism but with subtraction
-        field.subtractForceWithFalloff(
-          x, y,
-          brush.getSize(),
-          Math.abs(forceX),
-          Math.abs(forceY),
-          brush.getEffectiveFalloffType()
-        );
-      }
-      
-      // Update last paint position for next spacing check
-      lastPaintX = x;
-      lastPaintY = y;
-      
-      return true;
+    if (distance <= 0.0f) {
+      return false;
     }
-    
-    return false;
+
+    float spacing = Math.max(1.0f, brush.getSpacing());
+    float distanceToNextDab = spacing - distanceSinceLastDab;
+    float nextDabDistance = distanceToNextDab;
+    boolean applied = false;
+    while (nextDabDistance <= distance) {
+      float fraction = nextDabDistance / distance;
+      float dabX = lastPaintX + dx * fraction;
+      float dabY = lastPaintY + dy * fraction;
+      applyDab(dabX, dabY, dx / distance, dy / distance);
+      nextDabDistance += spacing;
+      applied = true;
+    }
+
+    distanceSinceLastDab = (distanceSinceLastDab + distance) % spacing;
+    lastPaintX = x;
+    lastPaintY = y;
+    return applied;
+  }
+
+  private void applyDab(float x, float y, float directionX, float directionY) {
+    float strength = brush.getStrength();
+    if (brush.getMode() == Brush.BrushMode.BRUSH) {
+      field.addForceWithFalloff(
+        x, y, brush.getSize(), directionX * strength, directionY * strength,
+        brush.getEffectiveFalloffType(), brush.getHardness());
+    } else {
+      field.subtractForceWithFalloff(
+        x, y, brush.getSize(), strength, strength,
+        brush.getEffectiveFalloffType(), brush.getHardness());
+    }
   }
   
   /**
@@ -116,13 +103,7 @@ public class BrushEngine {
    * Paint a single dot at the given position (no spacing requirement).
    */
   public void paintDot(float x, float y) {
-    field.addForceWithFalloff(
-      x, y,
-      brush.getSize(),
-      brush.getStrength(),
-      0,  // No vertical component for dot
-      brush.getEffectiveFalloffType()
-    );
+    applyDab(x, y, 1.0f, 0.0f);
     field.normalizeFieldIfNeeded();
   }
   

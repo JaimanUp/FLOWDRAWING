@@ -54,13 +54,7 @@ public class Brush {
    * Hardness: 0.0 = Linear, 0.5 = Gaussian, 1.0 = Hard Edge
    */
   public VectorField.FalloffType getEffectiveFalloffType() {
-    if (hardness < 0.33f) {
-      return VectorField.FalloffType.LINEAR;
-    } else if (hardness < 0.67f) {
-      return VectorField.FalloffType.GAUSSIAN;
-    } else {
-      return VectorField.FalloffType.HARD_EDGE;
-    }
+    return falloffType;
   }
   
   // ========== Getters & Setters ==========

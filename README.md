@@ -1,39 +1,46 @@
  # Flow‑Guided Generative Drawing Engine
 
-This repository contains the design and eventually the source code for a generative drawing tool built with **Processing (Java)**. Users manipulate a vector field with brushes; autonomous "bots" then traverse the field and leave trails that form the final artwork.
+FlowDrawing is a Windows desktop application built with **Java 11 and Swing**. Users manipulate a vector field with brushes; autonomous bots then traverse the field and leave trails that form the final artwork. Processing files under `src/` are legacy and are not compiled by Gradle.
 
 ## Purpose
-- Quick prototype implementation using Java/Processing
-- Follow the provided roadmap and software requirements without changing core subsystems
-- Expose configuration for normalization and radar sampling
+- Edit a vector field on a zoomable, pannable canvas
+- Simulate bots that follow the field and generate paths
+- Export the final paths and image as the application features are completed
 
 ## Getting Started
 
-### Option 1: Run with Gradle (Recommended)
+### Run with Gradle (Recommended)
 ```bash
-# Requires: Java 11+ and Gradle installed
-gradle run
+# Requires a JDK supported by Gradle 9.4.1; source and target APIs are Java 11
+.\gradlew.bat build
 ```
 
-### Option 2: Run from IDE
+Build:
+```bash
+.\gradlew.bat build
+```
+
+Run core logic checks:
+```bash
+.\gradlew.bat logicChecks
+```
+
+### Run from an IDE
 1. Import the root directory as a Gradle project in IntelliJ IDEA, Eclipse, or VS Code (with Gradle extension).
 2. Run the `FlowDrawing` main class.
-
-### Option 3: Process IDE (Legacy)
-⚠️ *Not recommended for this setup.*  
-If you must use Processing IDE, open the `/src` folder as a sketch. However, Gradle setup is preferred.
 
 ## Project Structure
 ```
 /src/main/java
-    FlowDrawing.java        (main entry point)
+    FlowDrawing.java        (main Swing window and composition root)
     CanvasManager.java      (canvas coordinator)
-    config/
-        Config.java         (global constants)
-    render/
-        CameraController.java
-        LayerRenderer.java
-    [future phases: field/, bots/, brushes/, simulation/, export/, optimization/, ui/]
+    bot/                    (bot agents and simulation)
+    brush/                  (brush model and input engine)
+    config/                 (global constants)
+    field/                  (vector field and vectors)
+    render/                 (camera and layer rendering)
+    ui/                     (tool panel and application menu)
+/planning                  (requirements, architecture, roadmap, tests)
 ```
 
 ## Features
@@ -42,6 +49,11 @@ If you must use Processing IDE, open the `/src` folder as a sketch. However, Gra
 - **Reset View**: Press 'r' to reset camera to default
 
 ## Key Documents
+- `planning/README.md` – planning index and document maintenance rules
+- `planning/requirements/` – functional, non-functional and UI requirements
+- `planning/architecture/` – architecture overview and decision log
+- `planning/roadmap/roadmap.md` – staged implementation plan and exit criteria
+- `planning/testing/test-strategy.md` – behavior checks and regression checklist
 - `deveopment_roadmap.txt` – phased feature plan with prototype notes
 - `Software requirements` – detailed requirements and UI description
 

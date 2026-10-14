@@ -14,12 +14,17 @@ public class AppMenuBar extends JMenuBar {
     // File
     void onNewProject();
     void onExit();
+    void onExportSvg();
+    void onExportDxf();
+    void onExportPng();
+    void onExportJpg();
     // View
     void onResetView();
     void onZoomIn();
     void onZoomOut();
     void onFitCanvas();
     void onToggleToolPanel();
+    void onVisualizationModeChanged(String mode);
   }
 
   public AppMenuBar(MenuListener listener) {
@@ -51,14 +56,17 @@ public class AppMenuBar extends JMenuBar {
 
     JMenu exportMenu = new JMenu("Export");
     JMenuItem exportSvg = new JMenuItem("Export as SVG");
-    exportSvg.setEnabled(false);  // [planned]
+    exportSvg.addActionListener(e -> { if (listener != null) listener.onExportSvg(); });
     JMenuItem exportDxf = new JMenuItem("Export as DXF");
-    exportDxf.setEnabled(false);  // [planned]
+    exportDxf.addActionListener(e -> { if (listener != null) listener.onExportDxf(); });
     JMenuItem exportPng = new JMenuItem("Export as PNG");
-    exportPng.setEnabled(false);  // [planned]
+    exportPng.addActionListener(e -> { if (listener != null) listener.onExportPng(); });
+    JMenuItem exportJpg = new JMenuItem("Export as JPG");
+    exportJpg.addActionListener(e -> { if (listener != null) listener.onExportJpg(); });
     exportMenu.add(exportSvg);
     exportMenu.add(exportDxf);
     exportMenu.add(exportPng);
+    exportMenu.add(exportJpg);
     fileMenu.add(exportMenu);
 
     fileMenu.addSeparator();
@@ -116,6 +124,24 @@ public class AppMenuBar extends JMenuBar {
     zoomOutItem.setToolTipText("Zoom out (or use Space + -)");
     zoomOutItem.addActionListener(e -> { if (listener != null) listener.onZoomOut(); });
     viewMenu.add(zoomOutItem);
+
+    viewMenu.addSeparator();
+
+    JMenu displayModeMenu = new JMenu("Vector Field Display");
+    ButtonGroup displayModeGroup = new ButtonGroup();
+    JRadioButtonMenuItem arrowsItem = new JRadioButtonMenuItem("Arrows", true);
+    arrowsItem.addActionListener(e -> {
+      if (listener != null) listener.onVisualizationModeChanged("arrow");
+    });
+    JRadioButtonMenuItem flowMapItem = new JRadioButtonMenuItem("Flow Map");
+    flowMapItem.addActionListener(e -> {
+      if (listener != null) listener.onVisualizationModeChanged("flowmap");
+    });
+    displayModeGroup.add(arrowsItem);
+    displayModeGroup.add(flowMapItem);
+    displayModeMenu.add(arrowsItem);
+    displayModeMenu.add(flowMapItem);
+    viewMenu.add(displayModeMenu);
 
     viewMenu.addSeparator();
 

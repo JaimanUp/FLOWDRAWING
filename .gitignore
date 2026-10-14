@@ -26,3 +26,7 @@ gradle-app.setting
 # project resources
 /export/
 /tmp/
+
+# Local environments and references
+.venv/
+/REFERENCIAS/

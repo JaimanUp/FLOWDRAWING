@@ -1,8 +1,6 @@
 package field;
 
-import java.io.FileWriter;
-import java.io.IOException;
-import java.time.LocalDateTime;
+import config.Config;
 
 /**
  * VectorField
@@ -21,6 +19,7 @@ public class VectorField {
   private float cellSize;
   private Vector2D[][] vectors;
   private float maxMagnitude;
+  private float fieldMagnitudeScale = 1.0f;
   private float normalizationThreshold;  // 0.3 = 30%
   
   public VectorField(int canvasWidth, int canvasHeight, float cellSize) {
@@ -28,8 +27,8 @@ public class VectorField {
     this.cols = Math.max(1, (int) Math.ceil(canvasWidth / cellSize));
     this.rows = Math.max(1, (int) Math.ceil(canvasHeight / cellSize));
     this.vectors = new Vector2D[cols][rows];
-    this.maxMagnitude = 5.0f;  // Default from Config
-    this.normalizationThreshold = 0.3f;  // 30% from Config
+    this.maxMagnitude = Config.DEFAULT_MAX_MAGNITUDE;
+    this.normalizationThreshold = Config.NORMALIZATION_THRESHOLD;
     
     // Initialize all vectors to zero
     for (int x = 0; x < cols; x++) {
@@ -40,21 +39,32 @@ public class VectorField {
   }
   
   /**
-   * Sample the vector field at a given world position.
-   * Uses nearest-neighbor for now (TODO: implement bilinear).
+   * Sample the vector field at a given world position using bilinear interpolation.
    */
   public Vector2D sample(float x, float y) {
-    float gridX = x / cellSize;
-    float gridY = y / cellSize;
-    
-    int ix = (int) Math.floor(gridX);
-    int iy = (int) Math.floor(gridY);
-    
-    // Clamp to grid bounds
-    ix = Math.max(0, Math.min(cols - 1, ix));
-    iy = Math.max(0, Math.min(rows - 1, iy));
-    
-    return vectors[ix][iy].copy();
+    float gridX = Math.max(0.0f, Math.min(cols - 1.0f, x / cellSize));
+    float gridY = Math.max(0.0f, Math.min(rows - 1.0f, y / cellSize));
+
+    int x0 = (int) Math.floor(gridX);
+    int y0 = (int) Math.floor(gridY);
+    int x1 = Math.min(cols - 1, x0 + 1);
+    int y1 = Math.min(rows - 1, y0 + 1);
+    float tx = gridX - x0;
+    float ty = gridY - y0;
+
+    Vector2D topLeft = vectors[x0][y0];
+    Vector2D topRight = vectors[x1][y0];
+    Vector2D bottomLeft = vectors[x0][y1];
+    Vector2D bottomRight = vectors[x1][y1];
+
+    float topX = topLeft.vx + (topRight.vx - topLeft.vx) * tx;
+    float topY = topLeft.vy + (topRight.vy - topLeft.vy) * tx;
+    float bottomX = bottomLeft.vx + (bottomRight.vx - bottomLeft.vx) * tx;
+    float bottomY = bottomLeft.vy + (bottomRight.vy - bottomLeft.vy) * tx;
+
+    return new Vector2D(
+      (topX + (bottomX - topX) * ty) * fieldMagnitudeScale,
+      (topY + (bottomY - topY) * ty) * fieldMagnitudeScale);
   }
   
   /**
@@ -72,6 +82,11 @@ public class VectorField {
    */
   public void addForceWithFalloff(float centerX, float centerY, float radius, 
                                    float fx, float fy, FalloffType falloff) {
+    addForceWithFalloff(centerX, centerY, radius, fx, fy, falloff, 0.0f);
+  }
+
+  public void addForceWithFalloff(float centerX, float centerY, float radius,
+                                   float fx, float fy, FalloffType falloff, float hardness) {
     int centerGX = (int) (centerX / cellSize);
     int centerGY = (int) (centerY / cellSize);
     int radiusInCells = (int) Math.ceil(radius / cellSize);
@@ -90,7 +105,7 @@ public class VectorField {
           float dist = (float) Math.sqrt(dx * dx + dy * dy);
           
           if (dist < radius) {
-            float factor = calculateFalloff(dist, radius, falloff);
+            float factor = calculateFalloff(dist, radius, falloff, hardness);
             vectors[gx][gy].add(normalizedFx * factor, normalizedFy * factor);
             vectors[gx][gy].clamp(maxMagnitude);
           }
@@ -105,6 +120,11 @@ public class VectorField {
    */
   public void subtractForceWithFalloff(float centerX, float centerY, float radius, 
                                         float fx, float fy, FalloffType falloff) {
+    subtractForceWithFalloff(centerX, centerY, radius, fx, fy, falloff, 0.0f);
+  }
+
+  public void subtractForceWithFalloff(float centerX, float centerY, float radius,
+                                        float fx, float fy, FalloffType falloff, float hardness) {
     int centerGX = (int) (centerX / cellSize);
     int centerGY = (int) (centerY / cellSize);
     int radiusInCells = (int) Math.ceil(radius / cellSize);
@@ -117,9 +137,8 @@ public class VectorField {
           float dist = (float) Math.sqrt(dx * dx + dy * dy);
           
           if (dist < radius) {
-            float factor = calculateFalloff(dist, radius, falloff);
-            // For eraser: completely clear vectors at center (factor=1), fade out at edges
-            // Scale vectors down to zero based on distance falloff
+            float strength = Math.min(1.0f, (Math.abs(fx) + Math.abs(fy)) * 0.5f);
+            float factor = calculateFalloff(dist, radius, falloff, hardness) * strength;
             vectors[gx][gy].scale(1.0f - factor);
           }
         }
@@ -130,18 +149,27 @@ public class VectorField {
   /**
    * Calculate falloff based on distance and type.
    */
-  private float calculateFalloff(float distance, float radius, FalloffType type) {
-    float normalized = distance / radius;  // 0 to 1
+  private float calculateFalloff(float distance, float radius, FalloffType type, float hardness) {
+    float normalizedHardness = Math.max(0.0f, Math.min(1.0f, hardness));
     
     switch (type) {
       case LINEAR:
-        return 1.0f - normalized;
       case GAUSSIAN:
-        return (float) Math.exp(-(normalized * normalized));
+        if (distance <= radius * normalizedHardness) {
+          return 1.0f;
+        }
+        float softEdgeWidth = radius * (1.0f - normalizedHardness);
+        if (softEdgeWidth <= 0.0f) {
+          return 0.0f;
+        }
+        float normalized = (distance - radius * normalizedHardness) / softEdgeWidth;
+        return type == FalloffType.LINEAR
+          ? 1.0f - normalized
+          : (float) Math.exp(-(normalized * normalized));
       case HARD_EDGE:
         return 1.0f;  // No falloff
       default:
-        return 1.0f - normalized;
+        return 1.0f - (distance / radius);
     }
   }
   
@@ -170,18 +198,13 @@ public class VectorField {
     int totalVectors = cols * rows;
     float percentAtMax = (float) countAtMax / totalVectors;
     
-    if (percentAtMax >= normalizationThreshold) {
-      float[] sumBefore = sumVectors();
-      // Scale all vectors proportionally
-      if (maxMag > maxMagnitude) {
-        float scaleFactor = maxMagnitude / maxMag;
-        for (int x = 0; x < cols; x++) {
-          for (int y = 0; y < rows; y++) {
-            vectors[x][y].scale(scaleFactor);
-          }
+    if (percentAtMax >= normalizationThreshold && maxMag > 0.0f) {
+      float targetMagnitude = maxMagnitude * (1.0f - normalizationThreshold);
+      float scaleFactor = Math.min(1.0f, targetMagnitude / maxMag);
+      for (int x = 0; x < cols; x++) {
+        for (int y = 0; y < rows; y++) {
+          vectors[x][y].scale(scaleFactor);
         }
-        float[] sumAfter = sumVectors();
-        logNormalizationWithSums(percentAtMax, maxMag, scaleFactor, sumBefore, sumAfter);
       }
     }
   }
@@ -197,36 +220,24 @@ public class VectorField {
       }
     }
   }
-  
-  private void logNormalization(float percentAtMax, float maxMag, float scaleFactor) {
-    try (FileWriter fw = new FileWriter("normalization_log.txt", true)) {
-      fw.write(String.format("%s - Normalization triggered: percentAtMax=%.3f, maxMag=%.3f, scaleFactor=%.3f\n",
-        LocalDateTime.now(), percentAtMax, maxMag, scaleFactor));
-    } catch (IOException e) {
-      // Ignore logging errors
-    }
-  }
-  
-  private void logNormalizationWithSums(float percentAtMax, float maxMag, float scaleFactor, float[] sumBefore, float[] sumAfter) {
-    try (FileWriter fw = new FileWriter("normalization_log.txt", true)) {
-      fw.write(String.format("%s - Normalization: percentAtMax=%.3f, maxMag=%.3f, scaleFactor=%.3f\n",
-        LocalDateTime.now(), percentAtMax, maxMag, scaleFactor));
-      fw.write(String.format("  Sum before: vx=%.3f, vy=%.3f\n", sumBefore[0], sumBefore[1]));
-      fw.write(String.format("  Sum after:  vx=%.3f, vy=%.3f\n", sumAfter[0], sumAfter[1]));
-    } catch (IOException e) {
-      // Ignore logging errors
-    }
-  }
-  
-  private float[] sumVectors() {
-    float sumX = 0, sumY = 0;
+
+  public void randomize() {
     for (int x = 0; x < cols; x++) {
       for (int y = 0; y < rows; y++) {
-        sumX += vectors[x][y].vx;
-        sumY += vectors[x][y].vy;
+        double angle = Math.random() * 2.0 * Math.PI;
+        float strength = 0.5f + (float) (Math.random() * 2.0);
+        vectors[x][y].vx = (float) Math.cos(angle) * strength;
+        vectors[x][y].vy = (float) Math.sin(angle) * strength;
       }
     }
-    return new float[]{sumX, sumY};
+  }
+
+  public void normalizeVectors() {
+    for (int x = 0; x < cols; x++) {
+      for (int y = 0; y < rows; y++) {
+        vectors[x][y].normalize();
+      }
+    }
   }
   
   // ========== Getters ==========
@@ -247,6 +258,17 @@ public class VectorField {
   
   public float getMaxMagnitude() {
     return maxMagnitude;
+  }
+
+  public float getFieldMagnitudeScale() {
+    return fieldMagnitudeScale;
+  }
+
+  public void setFieldMagnitudeScale(float scale) {
+    if (Float.isNaN(scale) || Float.isInfinite(scale)) {
+      return;
+    }
+    fieldMagnitudeScale = Math.max(0.0f, Math.min(2.0f, scale));
   }
   
   public int getCols() {

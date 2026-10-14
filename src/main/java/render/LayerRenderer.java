@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.BasicStroke;
 import java.awt.image.BufferedImage;
 import field.VectorField;
+import config.Config;
 
 /**
  * LayerRenderer
@@ -22,6 +23,9 @@ public class LayerRenderer {
   private BufferedImage strokeLayer;
   private BufferedImage botLayer;
   private BufferedImage backgroundImage;  // User-loaded background image
+  private Color backgroundColor = new Color(245, 245, 245);
+  private float backgroundTransparency = 1.0f;
+  private float vectorFieldTransparency = 1.0f;
   
   private int canvasWidth;   // Original canvas/vector field size (fixed)
   private int canvasHeight;  // Original canvas/vector field size (fixed)
@@ -54,14 +58,13 @@ public class LayerRenderer {
     clearBots();
     
     // Initialize Phase 2 field rendering - FIXED SIZE, NEVER CHANGES
-    // cellSize = 20.0f gives us 100x100 grid (doubled from 10.0f)
-    this.vectorField = new VectorField(canvasWidth, canvasHeight, 20.0f);
+    this.vectorField = new VectorField(canvasWidth, canvasHeight, Config.CELL_SIZE);
     this.fieldRenderer = new FieldRenderer(vectorField);
   }
   
   private void initializeBackground() {
     Graphics2D g2d = backgroundLayer.createGraphics();
-    g2d.setColor(new Color(245, 245, 245));
+    g2d.setColor(backgroundColor);
     g2d.fillRect(0, 0, canvasWidth, canvasHeight);  // Fixed canvas size
     g2d.dispose();
   }
@@ -91,16 +94,19 @@ public class LayerRenderer {
     // Store camera for later use
     this.cameraController = camera;
     
-    // Render background (only if showBackground is true)
+    g2d.setColor(new Color(46, 46, 46));
+    g2d.fillRect(0, 0, canvasWidth, canvasHeight);
+
     if (showBackground) {
+      java.awt.Composite originalComposite = g2d.getComposite();
+      g2d.setComposite(java.awt.AlphaComposite.getInstance(
+        java.awt.AlphaComposite.SRC_OVER, backgroundTransparency));
       if (backgroundImage != null) {
         g2d.drawImage(backgroundImage, 0, 0, null);
       } else {
         g2d.drawImage(backgroundLayer, 0, 0, null);
       }
-    } else {
-      // Draw default background when visibility is off
-      g2d.drawImage(backgroundLayer, 0, 0, null);
+      g2d.setComposite(originalComposite);
     }
     
     // Render vector field layer (optional, Phase 3)
@@ -113,7 +119,11 @@ public class LayerRenderer {
       fieldRenderer.render(fieldG2d, camera);  // Pass CameraController for zoom-aware rendering
       fieldG2d.dispose();
       
+      java.awt.Composite originalComposite = g2d.getComposite();
+      g2d.setComposite(java.awt.AlphaComposite.getInstance(
+        java.awt.AlphaComposite.SRC_OVER, vectorFieldTransparency));
       g2d.drawImage(vectorFieldLayer, 0, 0, null);
+      g2d.setComposite(originalComposite);
     }
     
     // Render stroke layer at canvas size
@@ -178,13 +188,17 @@ public class LayerRenderer {
   
   public void resetBackground() {
     Graphics2D g2d = backgroundLayer.createGraphics();
-    g2d.setColor(new Color(245, 245, 245));
+    g2d.setColor(backgroundColor);
     g2d.fillRect(0, 0, canvasWidth, canvasHeight);
     g2d.dispose();
   }
   
   public void setShowVectorField(boolean show) {
     this.showVectorField = show;
+  }
+
+  public void setVectorFieldTransparency(float transparency) {
+    this.vectorFieldTransparency = Math.max(0.0f, Math.min(1.0f, transparency));
   }
   
   public boolean isShowingVectorField() {
@@ -231,6 +245,23 @@ public class LayerRenderer {
   }
   
   // Background image management
+  public void setBackgroundColor(Color color) {
+    if (color == null) {
+      return;
+    }
+    backgroundColor = color;
+    backgroundImage = null;
+    resetBackground();
+  }
+
+  public Color getBackgroundColor() {
+    return backgroundColor;
+  }
+
+  public BufferedImage getBackgroundForSimulation() {
+    return backgroundImage != null ? backgroundImage : backgroundLayer;
+  }
+
   public void setBackgroundImage(BufferedImage img) {
     if (img != null) {
       // Scale image to fit canvas while preserving aspect ratio
@@ -238,7 +269,7 @@ public class LayerRenderer {
       java.awt.Graphics2D g2d = scaled.createGraphics();
       
       // Fill with background color first
-      g2d.setColor(new Color(245, 245, 245));
+      g2d.setColor(backgroundColor);
       g2d.fillRect(0, 0, canvasWidth, canvasHeight);
       
       // Calculate aspect-ratio-preserving dimensions
@@ -278,6 +309,10 @@ public class LayerRenderer {
   
   public void setShowBackground(boolean show) {
     this.showBackground = show;
+  }
+
+  public void setBackgroundTransparency(float transparency) {
+    this.backgroundTransparency = Math.max(0.0f, Math.min(1.0f, transparency));
   }
   
   public boolean isShowingBackground() {
